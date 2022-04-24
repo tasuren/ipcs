@@ -23,9 +23,8 @@ client.run()
 The request is for calling the other client's Route.  
 Requests can be made from `IpcsClient.request`.  
 The first argument is the ID of the client to which the message is sent.  
-If you set `AutoDecideALL`, the request will be sent to all clients connected to all servers. (In this case, there will be no response.)
 ```python
-await client.request("display", "Hello, World!", target=uuid)
+await client.request(id_, "display", "Hello, World!")
 ```
 ### Event
 An event is a function that is called at a specific time.  
