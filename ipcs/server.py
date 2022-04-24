@@ -12,7 +12,7 @@ import asyncio
 from websockets.server import serve, WebSocketServerProtocol
 from websockets.exceptions import ConnectionClosed
 
-from ujson import loads, dumps
+from orjson import loads, dumps
 
 from .types_ import Payload, ResponsePayload, Identifier
 from .utils import EventManager, _data_str

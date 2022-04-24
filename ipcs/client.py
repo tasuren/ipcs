@@ -15,7 +15,7 @@ import asyncio
 from websockets.exceptions import ConnectionClosed, ConnectionClosedOK
 from websockets.client import WebSocketClientProtocol, connect
 
-from ujson import dumps, loads
+from orjson import dumps, loads
 
 from .types_ import Route, Identifier, Payload, RequestPayload, ResponsePayload
 from .utils import DataEvent, EventManager, _get_exception_name, _data_str
