@@ -1,7 +1,7 @@
 # ipcs
 A library for Python for IPC.  
 
-**WARNING** This library is currently in beta.
+**WARNING** This library is currently in alpha.
 
 ## Installation
 `pip install ipcs`
