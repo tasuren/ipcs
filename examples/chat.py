@@ -4,22 +4,23 @@ from aioconsole import ainput
 from ipcs import IpcsClient
 
 
-client = IpcsClient()
+client = IpcsClient(input("UserName:"))
+print("Connecting...")
 
 
 @client.listen()
-async def on_connect_at_server(uuid):
-    print("SERVER: Joined", uuid)
+async def on_connect_at_server(id_):
+    print("SERVER: Joined", id_)
 
 
 @client.listen()
-async def on_disconnect_at_server(uuid):
-    print("SERVER: Leaved", uuid)
+async def on_disconnect_at_server(id_):
+    print("SERVER: Leaved", id_)
 
 
 @client.route()
-async def recv(uuid, message):
-    print(f"{uuid}: {message}")
+async def recv(id_, message):
+    print(f"{id_}: {message}")
 
 
 def client_print(content):
@@ -29,28 +30,18 @@ def client_print(content):
 @client.listen()
 async def on_ready():
     print("Ipcs Example - Chat\n")
-    print("# How to\nhelp\tDisplays help\nuuids\tDisplays users (uuids)\nsend\tSend message\n\te.g `send 1 Hi` to send message to the 1th UUID\n\tIf set to 0, it will be sent to all.")
+    print("# How to\nhelp\tDisplays help\nusers\tDisplays users (ids)\nsend\tSend message\n")
     while client.connected.is_set():
-        content: str = await ainput("")
+        content: str = await ainput()
         if content.startswith("send "):
-            try:
-                tentative = content.split()
-                uuid_number = tentative[1]
-                del tentative
-            except IndexError:
-                client_print("Argument is missing.")
-                continue
-            try:
+            for target in filter(lambda x: x != client.id_, client.clients):
                 await client.request(
-                    "recv", client.uuid, content := content.replace(f"send {uuid_number} ", ""),
-                    target="ALL" if uuid_number == "0" else client.uuids[int(uuid_number) - 1]
+                    target, "recv", client.id_,
+                    content[5:]
                 )
-            except IndexError:
-                client_print("That UUID could not be found.")
-            else:
-                print(f"{client.uuid}(you): {content}")
-        elif content == "uuids":
-            client_print("\n".join(f"{i} {uuid}" for i, uuid in enumerate(client.uuids, 1)))
+                print(f"{client.id_} (you): {content}")
+        elif content == "users":
+            client_print("Users:\n%s" % "\n".join(f"{id_}" for id_ in client.clients))
         else:
             client_print("It is wrong way to use this.")
 

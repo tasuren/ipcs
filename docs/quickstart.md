@@ -22,9 +22,8 @@ client.run()
 ### Request
 The request is for calling the other client's Route.  
 Requests can be made from `IpcsClient.request`.  
-The keyword argument `target` can be used to specify the destination as a UUID.  
-If this is omitted, the server will specify a random destination by default.  
-If you set `ALL`, the request will be sent to all clients connected to all servers. (In this case, there will be no response.)
+The first argument is the ID of the client to which the message is sent.  
+If you set `AutoDecideALL`, the request will be sent to all clients connected to all servers. (In this case, there will be no response.)
 ```python
 await client.request("display", "Hello, World!", target=uuid)
 ```
@@ -43,15 +42,15 @@ async def display(message):
     print(message)
 
 @client.listen()
-async def on_connect_at_server(uuid):
+async def on_connect_at_server(id_):
     # If another client connect to server.
-    await client.request("display", "Hello, World!", target=uuid)
+    await client.request(id_, "display", "Hello, World!")
 
 client.run(uri="ws://localhost/", port=8080)
 ```
 ### Server
 Servers that relay communications between clients do not need to be programmed.  
-You can run a relay server with `sipcs run`.
+You can run a relay server with `ipcs-server`.
 #### Notes
 Of course, it is possible to create a program to customize it.  
 In that case, use `IpcsServer`.  
@@ -61,4 +60,4 @@ Try running two of the above codes after you run the server.
 When you start the second one, you should see `Hello, World!` on the console of the second one.
 
 ## Console
-Run `sipcs --help` to see help information.
+Run `ipc-server --help` to see help information.

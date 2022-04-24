@@ -13,6 +13,7 @@ IPC is a library for creating programs for easy IPC communication.
 
    quickstart
    ipcs
+   event_reference
 
 .. toctree::
    :maxdepth: 1

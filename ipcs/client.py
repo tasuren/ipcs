@@ -17,7 +17,7 @@ from websockets.client import WebSocketClientProtocol, connect
 
 from ujson import dumps, loads
 
-from .types_ import AutoDecideRouteType, Route, Identifier, Payload, RequestPayload, ResponsePayload
+from .types_ import Route, Identifier, Payload, RequestPayload, ResponsePayload
 from .utils import DataEvent, EventManager, _get_exception_name, _data_str
 from . import exceptions
 
@@ -29,11 +29,15 @@ logger = getLogger("ipcs.client")
 
 RfT = TypeVar("RfT", bound=Route)
 class IpcsClient(EventManager):
-    "IPC client to connect to :class:`IpcServer`."
+    """IPC client to connect to :class:`IpcServer`.
+
+    Args:
+        id_: ID for client identification
+        timeout: Seconds until request times out"""
 
     ws: Optional[WebSocketClientProtocol] = None
     "This should assigned an instance of the class used for websocket communication."
-    uuid: Optional[Identifier] = None
+    me: Identifier
     "An identification ID that indicates who you are in ipc communication."
     timeout: float
     "The number of seconds to time out."
@@ -45,19 +49,20 @@ class IpcsClient(EventManager):
     "To record the status of the connection."
     ready: asyncio.Event
     "To record whether preparations have been completed"
-    uuids: list[Identifier]
-    "List of UUIDs of clients connecting to the server."
+    clients: list[Identifier]
+    "List of id of clients connecting to the server."
 
     _receiver_task: asyncio.Task[None]
 
-    def __init__(self, timeout: float = 8.0):
+    def __init__(self, id_: Optional[Identifier] = None, timeout: float = 8.0):
         self.timeout = timeout
 
         self.connected = asyncio.Event()
         self.ready = asyncio.Event()
         self.response_waiters = {}
         self.routes = {}
-        self.uuids = []
+        self.id_ = id_ or str(uuid4())
+        self.clients = []
 
         super().__init__()
 
@@ -121,14 +126,13 @@ class IpcsClient(EventManager):
 
     async def _process_request(self, request: RequestPayload) -> ResponsePayload:
         self._check_verified()
-        assert self.uuid is not None
         # リクエストを処理します。
         try:
             data = await self.run_route(request["route"], *request["args"], **request["kwargs"])
         except exceptions.RouteNotFound as e:
             logger.warn(f"Route '{request['route']}' which was requested was not found")
             data = ResponsePayload(
-                type="response", source=self.uuid, target=request["source"],
+                type="response", source=self.id_, target=request["source"],
                 session=request["session"], status="Warning", data=(
                     "RouteNotFound", (str(e),)
                 )
@@ -136,41 +140,35 @@ class IpcsClient(EventManager):
         except Exception as e:
             logger.error("Ignoring error while running route '%s':\n%s" % (request["route"], format_exc()))
             data = ResponsePayload(
-                type="response", source=self.uuid, target=request["source"],
+                type="response", source=self.id_, target=request["source"],
                 session=request["session"], status="Error", data=(
                     _get_exception_name(e), format_exc()
                 )
             )
         else:
             data = ResponsePayload(
-                type="response", source=self.uuid, target=request["source"],
+                type="response", source=self.id_, target=request["source"],
                 session=request["session"], status="Ok", data=data
             )
-        if request["target"] != "ALL":
         # レスポンスを送る。
-            await self._send_json(data)
+        await self._send_json(data)
 
     def is_verified(self) -> bool:
         "Whether the client has been admitted to the server."
-        return self.uuid is not None
+        return self.id_ is not None
 
     def _check_verified(self):
-        if self.uuid is None:
+        if self.id_ is None:
             raise exceptions.NotVerified("Not yet accepted as a client by the server.")
 
-    async def request(
-        self, route: str, *args,
-        target: Optional[Identifier | AutoDecideRouteType] = None,
-        **kwargs
-    ) -> Any:
+    async def request(self, target: Identifier, route: str, *args, **kwargs) -> Any:
         """Make a request to the other party.
 
         Args:
+            target: ID of the client to be sent.
+                Alternatively, it can be specified by :class:`ipcs.types_.AutoDecideRouteType`.
             route: The name of the route.
             *args: The arguments to be passed to the route.
-            target: UUID of the client to be sent.
-                Alternatively, it can be specified by :class:`ipcs.types_.AutoDecideRouteType`.
-                If not specified, the server will determine what to do.
             *kwargs: The keyword arguments to be passed to the route.
 
         Raises:
@@ -178,29 +176,27 @@ class IpcsClient(EventManager):
             TimeoutOnRequest: Occurs when a request times out.
             ExceptionRaisedOnRequest: Occurs when an error occurs at the request destination."""
         self._check_verified()
-        assert self.uuid is not None
 
         session = str(uuid4())
         self.response_waiters[session] = DataEvent()
         request_log = "%s - %s > %s" % (route, session, target)
         logger.info("Prepare request: %s" % request_log)
 
+        # もし送信先が不明の場合はエラーを起こす。
+        if target not in self.clients:
+            raise exceptions.TargetNotFound("No destination found: %s" % target)
+
         # リクエストを送る。
-        if isinstance(target, AutoDecideRouteType):
-            target = target.name
         try:
             await self._send_json(sent := RequestPayload(
-                type="request", source=self.uuid, target=target, session=session,
+                type="request", source=self.id_, target=target, session=session,
                 route=route, args=args, kwargs=kwargs
             ))
         except ConnectionClosed as e:
-            raise exceptions.ConnectionClosedOnRequest(
+            raise exceptions.ConnectionClosed(
                 e.code, e.reason, "Request failed because of disconnection."
             )
         self.call_event("on_request", sent)
-
-        if target == "ALL":
-            return
 
         # レスポンスを待機する。
         try:
@@ -210,7 +206,7 @@ class IpcsClient(EventManager):
             )
         except asyncio.TimeoutError:
             logger.warn("Timeout request: %s" % session)
-            raise exceptions.TimeoutOnRequest("No response was received for the request.")
+            raise exceptions.Timeout("No response was received for the request.")
         del self.response_waiters[session]
         self.call_event("on_response", data)
 
@@ -219,7 +215,7 @@ class IpcsClient(EventManager):
         if data["status"] == "Warning":
             raise getattr(exceptions, data["data"][0])(*data["data"][1])
         elif data["status"] == "Error":
-            raise exceptions.ExceptionRaisedOnRequest(data["data"][1])
+            raise exceptions.ExceptionRaised(data["data"][1])
         else:
             logger.info("Successful request: %s" % request_log)
             return data["data"]
@@ -229,30 +225,29 @@ class IpcsClient(EventManager):
         assert self.ws is not None
         logger.info(">>> %s" % _data_str(data))
         self.call_event("on_send", data)
-        await self.ws.send(dumps(data, ensure_ascii=False))
+        await self.ws.send(dumps(data))
 
     def _when_special(self, data: ResponsePayload) -> None:
         # Specialなレスポンスの場合呼ばれる。
         if data["data"][0] == "call_event":
             self.call_event(*data["data"][1][0], **data["data"][1][1])
-        elif data["data"][0] == "add_uuid":
-            if data["data"][1] not in self.uuids:
-                if data["data"][1] != self.uuid:
+        elif data["data"][0] == "add_id":
+            if data["data"][1] not in self.clients:
+                if data["data"][1] != self.clients:
                     self.call_event("on_connect_at_server", data["data"][1])
-                self.uuids.append(data["data"][1])
-        elif data["data"][0] == "remove_uuid":
-            if data["data"][1] in self.uuids:
-                if data["data"][1] != self.uuid:
+                self.clients.append(data["data"][1])
+        elif data["data"][0] == "remove_id":
+            if data["data"][1] in self.clients:
+                if data["data"][1] != self.id_:
                     self.call_event("on_disconnect_at_server", data["data"][1])
-                self.uuids.remove(data["data"][1])
-        elif data["data"][0] == "update_uuids":
-            self.uuids = data["data"][1]
+                self.clients.remove(data["data"][1])
+        elif data["data"][0] == "update_ids":
+            self.clients = data["data"][1]
 
     async def _receiver(self):
         # サーバーから送られてくるデータを受け取り適切な処理を行います。
         while True:
             data: Payload = loads(await self.ws.recv())
-            self.call_event("on_receive", data)
             logger.info("<<< %s" % _data_str(data))
 
             if data["type"] == "request":
@@ -272,11 +267,15 @@ class IpcsClient(EventManager):
                         # ここは普通実行されてはいけない場所です。もし実行されたのならバグがある可能性があることになる。
                         logger.warn("Unidentified data was sent: %s@%s" % (data["session"], data["source"]), stacklevel=1)
 
+            self.call_event("on_receive", data)
+
     async def _verify(self):
-        # 自分のUUIDを受け取る。
+        # 自分のIDが使用可能か確認したりする。
         await self.ws.recv()
-        await self.ws.send("verify")
-        self.uuid = await self.ws.recv()
+        await self.ws.send(self.id_)
+        result = await self.ws.recv()
+        if result != "1":
+            raise exceptions.VerifyFailed(result)
 
     @staticmethod
     def _dis_warn(e: Exception, l = logger):
@@ -290,7 +289,11 @@ class IpcsClient(EventManager):
 
         Args:
             reconnect: Whether to reconnect
-            **kwargs: The keyword arguments to be passed to :func:`websockets.client.connect`."""
+            **kwargs: The keyword arguments to be passed to :func:`websockets.client.connect`.
+
+        Raises:
+            VerifyFailed: Occurs when the client is not acknowledged by the server.
+                One possible cause is that a client with the same ID has already connected to the server."""
         logger.info("Connecting...")
         async for ws in connect(**kwargs):
             logger.info("Connected")
@@ -305,7 +308,7 @@ class IpcsClient(EventManager):
             try:
                 logger.info("Verifying...")
                 await asyncio.wait_for(self._verify(), timeout=self.timeout)
-                logger.info("Verified: %s" % self.uuid)
+                logger.info("Verified: %s" % self.id_)
 
                 self._receiver_task = asyncio.create_task(
                     self._receiver(), name="ipcs.client.reeciver"
@@ -359,10 +362,10 @@ class IpcsClient(EventManager):
         self.call_event("on_close")
         if hasattr(self, "ws") and self.ws is not None:
             await self.ws.close(code, reason)
-        if self.response_waiters and self.uuid is not None:
+        if self.response_waiters and self.id_ is not None:
             for key in list(self.response_waiters.keys()):
                 self.response_waiters[key].set(ResponsePayload(
-                    type="response", source=self.uuid, target=self.uuid,
+                    type="response", source=self.id_, target=self.id_,
                     session="", status="Warning", data=(
                         "ConnectionClosedOnRequest", (code, reason,),
                         "The request was not completed because the client disconnected from WebSocket."

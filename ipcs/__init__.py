@@ -6,5 +6,5 @@ from .exceptions import *
 from .types_ import *
 
 
-__version__ = "0.1.0a"
+__version__ = "0.1.0b0"
 __author__ = "tasuren"

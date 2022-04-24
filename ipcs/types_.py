@@ -7,8 +7,8 @@ from enum import Enum
 
 
 __all__ = (
-    "Route", "Identifier", "AutoDecideRouteType",
-    "Payload", "RequestPayload", "ResponsePayload"
+    "Route", "Identifier", "Payload",
+    "RequestPayload", "ResponsePayload"
 )
 
 
@@ -22,16 +22,6 @@ Session: TypeAlias = str
 "Alias for Session of request/response data."
 
 
-class AutoDecideRouteType(Enum):
-    "The type of how to determine which client to send the request to when no request destination is specified."
-
-    ALL = 0
-    """Send all client request.
-    No value will be returned."""
-    RANDOM = 1
-    "Send client which was choiced by server request"
-
-
 class Payload(TypedDict):
     """This is the base of the type of data to be sent and received.
     Normally, this class is not used by you."""
@@ -40,10 +30,9 @@ class Payload(TypedDict):
     "The type of data content."
     source: str
     """An identification ID to identify which ipc client the data is from.
-    For servers, it is ``"0"``."""
-    target: Identifier | None
-    """Destination identification ID.
-    If set to ``None``, the server will automatically determine the destination."""
+    For servers, it is ``"__IPCS_SERVER__"``."""
+    target: Identifier
+    "Destination identification ID."
     session: Session
     "Session ID to identify from which request the data came."
 

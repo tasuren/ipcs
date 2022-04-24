@@ -7,8 +7,6 @@ from typing import Optional
 from dataclasses import dataclass
 from traceback import format_exc
 from logging import getLogger
-from random import choice
-from uuid import uuid4
 import asyncio
 
 from websockets.server import serve, WebSocketServerProtocol
@@ -16,7 +14,7 @@ from websockets.exceptions import ConnectionClosed
 
 from ujson import loads, dumps
 
-from .types_ import Payload, ResponsePayload, Identifier, AutoDecideRouteType
+from .types_ import Payload, ResponsePayload, Identifier
 from .utils import EventManager, _data_str
 from .client import IpcsClient
 
@@ -30,61 +28,47 @@ logger = getLogger("ipcs.server")
 class Connection:
     "Data class for storing WebSockets connecting to the server."
 
-    uuid: Identifier
+    id_: Identifier
+    "ID to identify the connecting client"
     ws: WebSocketServerProtocol
+    "WebSocket used for communication"
     task: asyncio.Task
+    "Coroutine task for communication"
 
     async def _send_json(self, server: IpcsServer, data: Payload) -> None:
-        original = self.uuid
+        original = self.id_
         if data["target"] == "ALL":
             original = "ALL"
-        data["target"] = self.uuid
-        logger.info(">>> %s" % _data_str(data))
+        data["target"] = self.id_
         data["target"] = original
-        server.call_event("on_send", data)
         try:
-            await self.ws.send(dumps(data, ensure_ascii=False))
+            await self.ws.send(dumps(data))
         except ConnectionClosed:
             ...
+        logger.info(">>> %s" % _data_str(data))
+        server.call_event("on_send", data)
 
     def __str__(self) -> str:
-        return f"<Connection uuid={self.uuid} ws={self.ws} task={self.task}>"
+        return f"<Connection id_={self.id_} ws={self.ws} task={self.task}>"
 
 
 class IpcsServer(EventManager):
     """:class:`IpcClient` is the class of server that can be connected to.
-    If you are installing from pypi, you can easily do this from the console."""
+    If you are installing from pypi, you can easily do this from the console by ``ipcs-server``."""
 
     connections: dict[Identifier, Connection]
     "A dictionary that stores the WebSocket and other information during the connection."
-    auto_decide_route_type: AutoDecideRouteType
-    "The type of how to determine which client to send the request to when no request destination is specified."
 
     _close: Optional[asyncio.Future] = None
 
-    def __init__(self, auto_decide_route_type: AutoDecideRouteType = AutoDecideRouteType.RANDOM):
-        self.auto_decide_route_type = auto_decide_route_type
-
+    def __init__(self):
         self.connections = {}
 
         super().__init__()
 
-    async def _send(self, type_: AutoDecideRouteType | None, data: Payload, source: Identifier):
-        keys: list[Identifier] = list(filter(lambda x: x != source, self.connections.keys()))
-
-        # 送信先を探す。
-        if type_ is None:
-            if data["target"] is not None:
-                keys = [data["target"]]
-        elif keys:
-            if type_ == AutoDecideRouteType.RANDOM:
-                keys = [choice(keys)]
-
-        if keys:
-            await asyncio.gather(*(
-                self.connections[key]._send_json(self, data)
-                for key in keys
-            ))
+    async def _send_json(self, data: Payload):
+        if data["target"] in self.connections:
+            await self.connections[data["target"]]._send_json(self, data)
         else:
             logger.warn("The data was sent to me, but there was no place to send it: %s" % _data_str(data))
 
@@ -93,18 +77,13 @@ class IpcsServer(EventManager):
         try:
             while not connection.ws.closed:
                 data: Payload = loads(await connection.ws.recv()) # type: ignore
+
+                asyncio.create_task(
+                    self._send_json(data),
+                    name="ipc.server.send: %s" % connection
+                )
                 logger.info(f"<<< {_data_str(data)}")
                 self.call_event("on_receive", data)
-                if data["target"] is None:
-                    type_ = self.auto_decide_route_type
-                elif hasattr(AutoDecideRouteType, data["target"]):
-                    type_ = getattr(AutoDecideRouteType, data["target"])
-                else:
-                    type_ = None
-                asyncio.create_task(
-                    self._send(type_, data, connection.uuid),
-                    name="ipc-server-reply: %s" % connection
-                )
         except ConnectionClosed as e:
             IpcsClient._dis_warn(e, logger)
         except Exception as e:
@@ -119,54 +98,62 @@ class IpcsServer(EventManager):
         logger.info(f"New websocket: {ws}")
         try:
             await ws.send("Ok?")
-            assert await ws.recv() == "verify"
-            uuid = str(uuid4())
-            self.connections[uuid] = Connection(uuid, ws, None) # type: ignore
-            self.connections[uuid].task = asyncio.create_task(
-                self._communicate(self.connections[uuid]),
-                name=f"ipc-server-communicate: {self.connections[uuid]}"
-            )
-            await ws.send(uuid)
-            logger.info(f"Registered websocket: {uuid}")
+            id_ = await ws.recv()
+            assert isinstance(id_, str)
+            if id_ in self.connections:
+                await ws.send("That ID is already in use.")
+                await ws.close(1011, "That ID is already in use.")
+                await ws.recv()
+                return
+            else:
+                self.connections[id_] = Connection(id_, ws, None) # type: ignore
+                self.connections[id_].task = asyncio.create_task(
+                    self._communicate(self.connections[id_]),
+                    name=f"ipc-server-communicate: {self.connections[id_]}"
+                )
+                logger.info(f"Registered websocket: {id_}")
 
-            # クライアントにuuid追加を通知する。
-            await self._send_all(ResponsePayload(
-                type="response", source="0", target="",
-                session="0", status="Special", data=(
-                    "add_uuid", uuid
-                )
-            ))
-            await self.connections[uuid]._send_json(self, ResponsePayload(
-                type="response", source="0", target=uuid,
-                session="0", status="Special", data=(
-                    "update_uuids", list(self.connections.keys())
-                )
-            ))
+                await ws.send("1")
+
+                # クライアントにid追加を通知する。
+                await self._send_all(ResponsePayload(
+                    type="response", source="__IPCS_SERVER__", target="",
+                    session="__IPCS_SERVER__", status="Special", data=(
+                        "add_id", id_
+                    )
+                ))
+                await self.connections[id_]._send_json(self, ResponsePayload(
+                    type="response", source="__IPCS_SERVER__", target=id_,
+                    session="__IPCS_SERVER__", status="Special", data=(
+                        "update_ids", list(self.connections.keys())
+                    )
+                ))
         except ConnectionClosed as e:
             IpcsClient._dis_warn(e, logger)
+            return
 
         # 接続終了まで待機する。
-        self.call_event("on_connect", self.connections[uuid])
-        await self.connections[uuid].task
+        self.call_event("on_connect", self.connections[id_])
+        await self.connections[id_].task
 
         try:
-            # クライアントにuuid削除を通知する。
+            # クライアントにid削除を通知する。
             await self._send_all(ResponsePayload(
-                type="response", source="0", target="",
-                session="0", status="Special", data=(
-                    "remove_uuid", uuid
+                type="response", source="__IPCS_SERVER__", target="",
+                session="__IPCS_SERVER__", status="Special", data=(
+                    "remove_id", id_
                 )
             ))
         except ConnectionClosed as e:
             IpcsClient._dis_warn(e, logger)
 
-        self.call_event("on_disconnect", self.connections[uuid])
-        del self.connections[uuid]
+        self.call_event("on_disconnect", self.connections[id_])
+        del self.connections[id_]
 
     async def _send_all(self, data):
         await asyncio.gather(*(
-            self.connections[uuid]._send_json(self, data.copy())
-            for uuid in self.connections.keys()
+            self.connections[id_]._send_json(self, data.copy())
+            for id_ in self.connections.keys()
         ))
 
     async def start(self, **kwargs) -> None:

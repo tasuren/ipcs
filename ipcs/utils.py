@@ -15,6 +15,7 @@ __all__ = ("DataEvent", "EventManager")
 
 DataT = TypeVar("DataT")
 class DataEvent(asyncio.Event, Generic[DataT]):
+    "Extends :class:`asyncio.Event` to allow storing data."
 
     data: Optional[DataT] = None
 
@@ -41,7 +42,8 @@ def _data_str(data: Payload) -> str:
 
 EfT = TypeVar("EfT", bound=EventFunction)
 class EventManager:
-    "This class is used for calling events."
+    """This class is used for calling events.
+    The :ref:`Event Reference<event_reference>` describes the events that are included in the standard."""
 
     listeners: defaultdict[str, list[EventFunction]]
     "This dictionary contains event functions."
