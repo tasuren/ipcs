@@ -24,7 +24,7 @@ from . import exceptions
 
 __all__ = ("IpcsClient", "logger")
 logger = getLogger("ipcs.client")
-"Logger of ``logging`` in the standard library.\nName: `ipcs.client`"
+"Logger of ``logging`` in the standard library.\nName: ``ipcs.client``"
 
 
 RfT = TypeVar("RfT", bound=Route)
@@ -151,6 +151,7 @@ class IpcsClient(EventManager):
             await self._send_json(data)
 
     def is_verified(self) -> bool:
+        "Whether the client has been admitted to the server."
         return self.uuid is not None
 
     def _check_verified(self):
@@ -168,7 +169,7 @@ class IpcsClient(EventManager):
             route: The name of the route.
             *args: The arguments to be passed to the route.
             target: UUID of the client to be sent.
-                Alternatively, it can be specified by :class:`AutoDecideRouteType`.
+                Alternatively, it can be specified by :class:`ipcs.types_.AutoDecideRouteType`.
                 If not specified, the server will determine what to do.
             *kwargs: The keyword arguments to be passed to the route.
 
@@ -235,12 +236,14 @@ class IpcsClient(EventManager):
         if data["data"][0] == "call_event":
             self.call_event(*data["data"][1][0], **data["data"][1][1])
         elif data["data"][0] == "add_uuid":
-            self.call_event("on_connect_at_server", data["data"][1])
             if data["data"][1] not in self.uuids:
+                if data["data"][1] != self.uuid:
+                    self.call_event("on_connect_at_server", data["data"][1])
                 self.uuids.append(data["data"][1])
         elif data["data"][0] == "remove_uuid":
-            self.call_event("on_disconnect_at_server", data["data"][1])
             if data["data"][1] in self.uuids:
+                if data["data"][1] != self.uuid:
+                    self.call_event("on_disconnect_at_server", data["data"][1])
                 self.uuids.remove(data["data"][1])
         elif data["data"][0] == "update_uuids":
             self.uuids = data["data"][1]
@@ -275,7 +278,12 @@ class IpcsClient(EventManager):
         await self.ws.send("verify")
         self.uuid = await self.ws.recv()
 
-    _DIS_WARN = "It disconnects and reconnects after three seconds: %s"
+    @staticmethod
+    def _dis_warn(e: Exception, l = logger):
+        if isinstance(e, ConnectionClosedOK):
+            l.info("It disconnects and reconnects after three seconds: %s" % e)
+        else:
+            l.warn("It disconnects and reconnects after three seconds: %s" % e)
 
     async def connect(self, reconnect: bool = True, **kwargs) -> None:
         """Connect to the server.
@@ -311,10 +319,7 @@ class IpcsClient(EventManager):
                     self.ready.clear()
                     self.call_event("on_disconnect")
                     if reconnect:
-                        if isinstance(e, ConnectionClosedOK):
-                            logger.info(self._DIS_WARN % e)
-                        else:
-                            logger.warn(self._DIS_WARN % e)
+                        self._dis_warn(e)
                         await asyncio.sleep(3)
                         logger.info("Connecting...")
                         continue

@@ -42,7 +42,7 @@ setup(
     python_requires='>=3.10.0',
     entry_points={
         "console_scripts": [
-            "ipcs = ipcs.__main__:main"
+            "sipcs = ipcs.__main__:main"
         ]
     },
     classifiers=[

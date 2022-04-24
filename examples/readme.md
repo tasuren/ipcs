@@ -4,6 +4,7 @@
 It is working at terminal.  
 
 ### Installation
+`pip install aioconsole` to install requirements.
 `ipcs run` to run server.
 And `python3 client.py` to open chat.
 

@@ -18,6 +18,7 @@ from ujson import loads, dumps
 
 from .types_ import Payload, ResponsePayload, Identifier, AutoDecideRouteType
 from .utils import EventManager, _data_str
+from .client import IpcsClient
 
 
 __all__ = ("Connection", "IpcsServer", "logger")
@@ -43,8 +44,8 @@ class Connection:
         server.call_event("on_send", data)
         try:
             await self.ws.send(dumps(data, ensure_ascii=False))
-        except ConnectionClosed as e:
-            logger.warn("It was disconnected for some reason: %s" % e)
+        except ConnectionClosed:
+            ...
 
     def __str__(self) -> str:
         return f"<Connection uuid={self.uuid} ws={self.ws} task={self.task}>"
@@ -105,8 +106,7 @@ class IpcsServer(EventManager):
                     name="ipc-server-reply: %s" % connection
                 )
         except ConnectionClosed as e:
-            logger.warn("It was disconnected for some reason: %s" % e)
-            logger.debug(format_exc())
+            IpcsClient._dis_warn(e, logger)
         except Exception as e:
             logger.error(f"Ignoring error on communication:\n{format_exc()}")
 
@@ -117,42 +117,48 @@ class IpcsServer(EventManager):
         Args:
             ws: WebSocket"""
         logger.info(f"New websocket: {ws}")
-        await ws.send("Ok?")
-        assert await ws.recv() == "verify"
-        uuid = str(uuid4())
-        self.connections[uuid] = Connection(uuid, ws, None) # type: ignore
-        self.connections[uuid].task = asyncio.create_task(
-            self._communicate(self.connections[uuid]),
-            name=f"ipc-server-communicate: {self.connections[uuid]}"
-        )
-        await ws.send(uuid)
-        logger.info(f"Registered websocket: {uuid}")
+        try:
+            await ws.send("Ok?")
+            assert await ws.recv() == "verify"
+            uuid = str(uuid4())
+            self.connections[uuid] = Connection(uuid, ws, None) # type: ignore
+            self.connections[uuid].task = asyncio.create_task(
+                self._communicate(self.connections[uuid]),
+                name=f"ipc-server-communicate: {self.connections[uuid]}"
+            )
+            await ws.send(uuid)
+            logger.info(f"Registered websocket: {uuid}")
 
-        # クライアントにuuid追加を通知する。
-        await self._send_all(ResponsePayload(
-            type="response", source="0", target="",
-            session="0", status="Special", data=(
-                "add_uuid", uuid
-            )
-        ))
-        await self.connections[uuid]._send_json(self, ResponsePayload(
-            type="response", source="0", target=uuid,
-            session="0", status="Special", data=(
-                "update_uuids", list(self.connections.keys())
-            )
-        ))
+            # クライアントにuuid追加を通知する。
+            await self._send_all(ResponsePayload(
+                type="response", source="0", target="",
+                session="0", status="Special", data=(
+                    "add_uuid", uuid
+                )
+            ))
+            await self.connections[uuid]._send_json(self, ResponsePayload(
+                type="response", source="0", target=uuid,
+                session="0", status="Special", data=(
+                    "update_uuids", list(self.connections.keys())
+                )
+            ))
+        except ConnectionClosed as e:
+            IpcsClient._dis_warn(e, logger)
 
         # 接続終了まで待機する。
         self.call_event("on_connect", self.connections[uuid])
         await self.connections[uuid].task
 
-        # クライアントにuuid削除を通知する。
-        await self._send_all(ResponsePayload(
-            type="response", source="0", target="",
-            session="0", status="Special", data=(
-                "remove_uuid", uuid
-            )
-        ))
+        try:
+            # クライアントにuuid削除を通知する。
+            await self._send_all(ResponsePayload(
+                type="response", source="0", target="",
+                session="0", status="Special", data=(
+                    "remove_uuid", uuid
+                )
+            ))
+        except ConnectionClosed as e:
+            IpcsClient._dis_warn(e, logger)
 
         self.call_event("on_disconnect", self.connections[uuid])
         del self.connections[uuid]

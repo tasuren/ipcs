@@ -20,16 +20,15 @@ logger.addHandler(handler)
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("run", help="Run the ipcs' server.")
     parser.add_argument("--host", default="localhost", help="Host Name")
     parser.add_argument("--port", default=8080, help="Port", type=int)
-    parser.add_argument("--version", action="store_true", help="Port.")
+    parser.add_argument("--version", action="store_true", help="Version")
     args = parser.parse_args()
 
 
     if args.version:
         print(__version__)
-    elif args.run:
+    else:
         logger.info(f"ipcs v{__version__}")
         logger.info("Host: %s, Port: %s" % (args.host, args.port))
         server = IpcsServer()
