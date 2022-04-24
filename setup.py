@@ -37,7 +37,7 @@ setup(
     keywords='ipc',
     packages=["ipcs"],
     package_data={"ipcs": ("py.typed",)},
-    install_requires=("websockets", "ujson"),
+    install_requires=("websockets", "orjson"),
     extras_requires={},
     python_requires='>=3.10.0',
     entry_points={
