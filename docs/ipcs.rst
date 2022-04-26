@@ -4,6 +4,14 @@ ipcs package
 Submodules
 ----------
 
+ipcs.base module
+----------------
+
+.. automodule:: ipcs.base
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ipcs.client module
 ------------------
 
