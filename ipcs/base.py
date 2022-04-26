@@ -211,9 +211,9 @@ class IpcsClientBase(EventManager, RouteManager):
             *kwargs: The keyword arguments to be passed to the route.
 
         Raises:
-            ConnectionClosedOnRequest: This occurs when a disconnection occurs during a request.
-            TimeoutOnRequest: Occurs when a request times out.
-            ExceptionRaisedOnRequest: Occurs when an error occurs at the request destination.
+            ConnectionClosed: This occurs when a disconnection occurs during a request.
+            Timeout: Occurs when a request times out.
+            ExceptionRaised: Occurs when an error occurs at the request destination.
             TargetNotFound: Occurs when the destination of the request cannot be found.
 
         Notes:
