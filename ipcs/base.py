@@ -206,7 +206,6 @@ class IpcsClientBase(EventManager, RouteManager):
 
         Args:
             target: ID of the client to be sent.
-                Alternatively, it can be specified by :class:`ipcs.types_.AutoDecideRouteType`.
             route: The name of the route.
             *args: The arguments to be passed to the route.
             *kwargs: The keyword arguments to be passed to the route.
