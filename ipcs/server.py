@@ -15,8 +15,9 @@ from websockets.exceptions import ConnectionClosed
 from orjson import loads, dumps
 
 from .types_ import Payload, ResponsePayload, Identifier
-from .utils import EventManager, _data_str
+from .base import IpcsClientBase
 from .client import IpcsClient
+from .utils import _data_str
 
 
 __all__ = ("Connection", "IpcsServer", "logger")
@@ -30,21 +31,22 @@ class Connection:
 
     id_: Identifier
     "ID to identify the connecting client"
-    ws: WebSocketServerProtocol
-    "WebSocket used for communication"
-    task: asyncio.Task
-    "Coroutine task for communication"
+    ws: WebSocketServerProtocol | None = None
+    """WebSocket used for communication.
+    For ``Connection`` to handle requests from clients to the server, this is ``None``."""
+    task: asyncio.Task | None = None
+    """Coroutine task for communication.
+    For ``Connection`` to handle requests from clients to the server, this is ``None``."""
 
     async def _send_json(self, server: IpcsServer, data: Payload) -> None:
-        original = self.id_
-        if data["target"] == "ALL":
-            original = "ALL"
         data["target"] = self.id_
-        data["target"] = original
-        try:
-            await self.ws.send(dumps(data))
-        except ConnectionClosed:
-            ...
+        if self.ws is None:
+            server.on_receive(data)
+        else:
+            try:
+                await self.ws.send(dumps(data))
+            except ConnectionClosed:
+                ...
         logger.info(">>> %s" % _data_str(data))
         server.call_event("on_send", data)
 
@@ -52,21 +54,29 @@ class Connection:
         return f"<Connection id_={self.id_} ws={self.ws} task={self.task}>"
 
 
-class IpcsServer(EventManager):
-    """:class:`IpcClient` is the class of server that can be connected to.
-    If you are installing from pypi, you can easily do this from the console by ``ipcs-server``."""
+class IpcsServer(IpcsClientBase):
+    """:class:`IpcClient` is the class of the server to which you can connect.
+    If you are installing from pypi, you can easily do this from the console with ``ipcs-server``.
+    The client makes a request to the client, and this server class relays that request.
+    ipcs also supports requests from the client to the server.
+    The ID of the server is ``__IPCS_SERVER__``."""
 
     connections: dict[Identifier, Connection]
-    "A dictionary that stores the WebSocket and other information during the connection."
+    """A dictionary that stores the WebSocket and other information during the connection.
+    This includes a ``Connection`` for the client to make a request to the server.
+    For this ``Connection``, the ``ws`` attribute, etc. will be ``None``.
+    See :class:`Connection` for details.
+    Note that the ID of the server is ``__IPCS_SERVER__``."""
 
     _close: Optional[asyncio.Future] = None
+    _logger = logger
 
-    def __init__(self):
-        self.connections = {}
+    def __init__(self, timeout: float = 8.0):
+        self.connections = {"__IPCS_SERVER__": Connection("__IPCS_SERVER__")}
 
-        super().__init__()
+        super().__init__("__IPCS_SERVER__", timeout)
 
-    async def _send_json(self, data: Payload):
+    async def send_json(self, data: Payload):
         if data["target"] in self.connections:
             await self.connections[data["target"]]._send_json(self, data)
         else:
@@ -74,12 +84,13 @@ class IpcsServer(EventManager):
 
     async def _communicate(self, connection: Connection):
         # クライアントから送られて来たデータを、他のクライアントに送る。
+        assert connection.ws is not None
         try:
             while not connection.ws.closed:
                 data: Payload = loads(await connection.ws.recv()) # type: ignore
 
                 asyncio.create_task(
-                    self._send_json(data),
+                    self.send_json(data),
                     name="ipc.server.send: %s" % connection
                 )
                 logger.info(f"<<< {_data_str(data)}")
@@ -113,7 +124,7 @@ class IpcsServer(EventManager):
                 )
                 logger.info(f"Registered websocket: {id_}")
 
-                await ws.send("1")
+                await ws.send("1") # 検証成功メッセージを送る。
 
                 # クライアントにid追加を通知する。
                 await self._send_all(ResponsePayload(
@@ -134,7 +145,7 @@ class IpcsServer(EventManager):
 
         # 接続終了まで待機する。
         self.call_event("on_connect", self.connections[id_])
-        await self.connections[id_].task
+        await self.connections[id_].task # type: ignore
 
         try:
             # クライアントにid削除を通知する。
@@ -154,6 +165,7 @@ class IpcsServer(EventManager):
         await asyncio.gather(*(
             self.connections[id_]._send_json(self, data.copy())
             for id_ in self.connections.keys()
+            if id_ != "__IPCS_SERVER__"
         ))
 
     async def start(self, **kwargs) -> None:
@@ -189,9 +201,10 @@ class IpcsServer(EventManager):
         self.call_event("on_close")
         logger.info("Closing all connections...")
         for key, connection in list(self.connections.items()):
-            await connection.ws.close(code, reason)
-            del self.connections[key]
-            logger.info("[%s] Closed" % key)
+            if connection.ws is not None:
+                await connection.ws.close(code, reason)
+                del self.connections[key]
+                logger.info("[%s] Closed" % key)
         if self._close is not None:
             self._close.set_result(None)
         logger.info("Closed")

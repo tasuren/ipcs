@@ -35,11 +35,12 @@ async def on_ready():
         content: str = await ainput()
         if content.startswith("send "):
             for target in filter(lambda x: x != client.id_, client.clients):
-                await client.request(
-                    target, "recv", client.id_,
-                    content[5:]
-                )
-                print(f"{client.id_} (you): {content}")
+                if target != "__IPCS_SERVER__":
+                    await client.request(
+                        target, "recv", client.id_,
+                        content[5:]
+                    )
+                    print(f"{client.id_} (you): {content}")
         elif content == "users":
             client_print("Users:\n%s" % "\n".join(f"{id_}" for id_ in client.clients))
         else:

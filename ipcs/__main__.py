@@ -32,6 +32,15 @@ def main():
         logger.info(f"ipcs v{__version__}")
         logger.info("Host: %s, Port: %s" % (args.host, args.port))
         server = IpcsServer()
+
+        @server.route()
+        def ping():
+            return "pong"
+
+        @server.route("print")
+        def print_(*args, **kwargs):
+            print(*args, **kwargs)
+
         server.run(host=args.host, port=args.port)
         logger.info("Bye")
 
