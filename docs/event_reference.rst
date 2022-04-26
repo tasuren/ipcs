@@ -8,8 +8,6 @@ Client Side
 -----------
 * ``on_ready()``
     It is called when the client is ready.
-* ``on_run_route(target: str, args: tuple[Any], kwargs: dict[str, Any])``
-    It is called before Route is executed.
 * ``on_request(sent: RequestPayload)``
     It is called when making a request.
 * ``on_response(data: ResponsePayload)``
