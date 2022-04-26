@@ -53,10 +53,11 @@ You can run a relay server with `ipcs-server`.
 #### Notes
 Of course, it is possible to create a program to customize it.  
 In that case, use `IpcsServer`.  
-You can probably embed it in your web server.
+You can probably embed it in your web server.  
+The client can also make requests to the server.
 ### Run
 Try running two of the above codes after you run the server.  
 When you start the second one, you should see `Hello, World!` on the console of the second one.
 
 ## Console
-Run `ipc-server --help` to see help information.
+Run `ipcs-server --help` to see help information.
