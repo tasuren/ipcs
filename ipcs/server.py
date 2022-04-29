@@ -80,7 +80,7 @@ class IpcsServer(IpcsClientBase):
         if data["target"] in self.connections:
             await self.connections[data["target"]]._send_json(self, data)
         else:
-            logger.warn("The data was sent to me, but there was no place to send it: %s" % _data_str(data))
+            logger.warning("The data was sent to me, but there was no place to send it: %s" % _data_str(data))
 
     def is_ws_closed(self, ws: WebSocketServerProtocol) -> bool:
         """Check because WebSocket is finished.

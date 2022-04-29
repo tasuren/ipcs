@@ -249,7 +249,7 @@ class IpcsClientBase(EventManager, RouteManager):
                 timeout=self.timeout
             )
         except asyncio.TimeoutError:
-            self._logger.warn("Timeout request: %s" % session)
+            self._logger.warning("Timeout request: %s" % session)
             raise exceptions.Timeout("No response was received for the request.")
         del self.response_waiters[session]
         self.call_event("on_response", data)
@@ -270,7 +270,7 @@ class IpcsClientBase(EventManager, RouteManager):
         try:
             data = await self.run_route(request["route"], *request["args"], **request["kwargs"])
         except exceptions.RouteNotFound as e:
-            self._logger.warn(f"Route '{request['route']}' which was requested was not found")
+            self._logger.warning(f"Route '{request['route']}' which was requested was not found")
             data = ResponsePayload(
                 type="response", source=self.id_, target=request["source"],
                 session=request["session"], status="Warning", data=(
@@ -318,7 +318,7 @@ class IpcsClientBase(EventManager, RouteManager):
                     self.response_waiters[data["session"]].set(data) # type: ignore
                 else:
                     # ここは普通実行されてはいけない場所です。もし実行されたのならバグがある可能性があることになる。
-                    self._logger.warn("Unidentified data was sent: %s@%s" % (data["session"], data["source"]), stacklevel=1)
+                    self._logger.warning("Unidentified data was sent: %s@%s" % (data["session"], data["source"]), stacklevel=1)
 
         self.call_event("on_receive", data)
 
@@ -335,4 +335,4 @@ class IpcsClientBase(EventManager, RouteManager):
         if isinstance(e, ConnectionClosedOK):
             l.info("It disconnects and reconnects after three seconds: %s" % e)
         else:
-            l.warn("It disconnects and reconnects after three seconds: %s" % e)
+            l.warning("It disconnects and reconnects after three seconds: %s" % e)
