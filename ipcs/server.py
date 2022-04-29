@@ -82,11 +82,18 @@ class IpcsServer(IpcsClientBase):
         else:
             logger.warn("The data was sent to me, but there was no place to send it: %s" % _data_str(data))
 
+    def is_ws_closed(self, ws: WebSocketServerProtocol) -> bool:
+        """Check because WebSocket is finished.
+
+        Args:
+            ws: WebSocket"""
+        return ws.closed
+
     async def _communicate(self, connection: Connection):
         # クライアントから送られて来たデータを、他のクライアントに送る。
         assert connection.ws is not None
         try:
-            while not connection.ws.closed:
+            while not self.is_ws_closed(connection.ws):
                 data: Payload = loads(await connection.ws.recv()) # type: ignore
 
                 asyncio.create_task(
