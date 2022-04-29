@@ -36,9 +36,9 @@ Server Side
     It is called when sending data.
 * ``on_receive(data: RequestPayload | ResponsePayload)``
     It is called when receiving data.
-* ``on_connect()``
+* ``on_connect(id_: Identifier)``
     It is called when the client connects to the server.
-* ``on_disconnect()``
+* ``on_disconnect(id_: Identifier)``
     Called when the client disconnects from the server.
 * ``on_close()``
     It is called when the client processes an exit.
