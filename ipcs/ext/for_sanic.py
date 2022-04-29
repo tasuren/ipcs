@@ -24,6 +24,10 @@ class SanicIpcsServer(IpcsServer):
         return ws.connection.state == CLOSED
 
     async def communicate(self, ws: WebsocketImplProtocol) -> None: # type: ignore
+        """Register Sanic's WebSocket with IpcsServer.
+
+        Args:
+            ws: WebSocket"""
         return await super().communicate(ws) # type: ignore
 
     async def start(self, **_) -> None:
