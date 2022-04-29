@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from asyncio import all_tasks
+
 from websockets.connection import CLOSED
 
 from ..server import IpcsServer
@@ -41,3 +43,10 @@ class SanicIpcsServer(IpcsServer):
     def run(self, **_) -> None:
         "This is not implemented. Use :meth:`SanicIpcsServer.communicate`."
         raise NotImplementedError("Use `.communicate`.")
+
+    async def close(self, *args, **kwargs) -> None:
+        for task in all_tasks():
+            if "WebsocketFrameAssembler" in str(task.get_coro()):
+                if not task.done():
+                    task.cancel("Close")
+        return await super().close(*args, **kwargs)
