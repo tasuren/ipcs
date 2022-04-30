@@ -59,7 +59,12 @@ class IpcsServer(IpcsClientBase):
     If you are installing from pypi, you can easily do this from the console with ``ipcs-server``.
     The client makes a request to the client, and this server class relays that request.
     ipcs also supports requests from the client to the server.
-    The ID of the server is ``__IPCS_SERVER__``."""
+    The ID of the server is ``__IPCS_SERVER__``.
+
+    Args:
+        timeout: The number of seconds to wait for a response.
+        ignore_verify: Whether to ignore verification.
+            If this is set to ``True``, when a new client connects, the previously connected client is disconnected if a client with the same ID as the client has already connected."""
 
     connections: dict[Identifier, Connection]
     """A dictionary that stores the WebSocket and other information during the connection.
@@ -71,8 +76,9 @@ class IpcsServer(IpcsClientBase):
     _close: Optional[asyncio.Future] = None
     _logger = logger
 
-    def __init__(self, timeout: float = 8.0):
+    def __init__(self, timeout: float = 8.0, ignore_verify: bool = False):
         self.connections = {"__IPCS_SERVER__": Connection("__IPCS_SERVER__")}
+        self.ignore_verify = ignore_verify
 
         super().__init__("__IPCS_SERVER__", timeout)
 
@@ -119,33 +125,37 @@ class IpcsServer(IpcsClientBase):
             id_ = await ws.recv()
             assert isinstance(id_, str)
             if id_ in self.connections:
-                await ws.send("That ID is already in use.")
-                await ws.close(1011, "That ID is already in use.")
-                await ws.recv()
-                return
-            else:
-                self.connections[id_] = Connection(id_, ws, None) # type: ignore
-                self.connections[id_].task = asyncio.create_task(
-                    self._communicate(self.connections[id_]),
-                    name=f"ipc-server-communicate: {self.connections[id_]}"
+                if self.ignore_verify:
+                    # もし検証を無視するように設定されている場合は、すでにある接続を切断する。
+                    await self.connections[id_].ws.close(reason="Override") # type: ignore
+                    del self.connections[id_]
+                else:
+                    await ws.send("That ID is already in use.")
+                    await ws.close(1011, "That ID is already in use.")
+                    await ws.recv()
+                    return
+            self.connections[id_] = Connection(id_, ws, None) # type: ignore
+            self.connections[id_].task = asyncio.create_task(
+                self._communicate(self.connections[id_]),
+                name=f"ipc-server-communicate: {self.connections[id_]}"
+            )
+            logger.info(f"Registered websocket: {id_}")
+
+            await ws.send("1") # 検証成功メッセージを送る。
+
+            # クライアントにid追加を通知する。
+            await self._send_all(ResponsePayload(
+                type="response", source="__IPCS_SERVER__", target="",
+                session="__IPCS_SERVER__", status="Special", data=(
+                    "add_id", id_
                 )
-                logger.info(f"Registered websocket: {id_}")
-
-                await ws.send("1") # 検証成功メッセージを送る。
-
-                # クライアントにid追加を通知する。
-                await self._send_all(ResponsePayload(
-                    type="response", source="__IPCS_SERVER__", target="",
-                    session="__IPCS_SERVER__", status="Special", data=(
-                        "add_id", id_
-                    )
-                ))
-                await self.connections[id_]._send_json(self, ResponsePayload(
-                    type="response", source="__IPCS_SERVER__", target=id_,
-                    session="__IPCS_SERVER__", status="Special", data=(
-                        "update_ids", list(self.connections.keys())
-                    )
-                ))
+            ))
+            await self.connections[id_]._send_json(self, ResponsePayload(
+                type="response", source="__IPCS_SERVER__", target=id_,
+                session="__IPCS_SERVER__", status="Special", data=(
+                    "update_ids", list(self.connections.keys())
+                )
+            ))
         except ConnectionClosed as e:
             IpcsClient._dis_warn(e, logger)
             return

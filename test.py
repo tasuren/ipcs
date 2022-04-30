@@ -1,7 +1,9 @@
 
+from sys import argv
+
 from ipcs import IpcsClient
 
-client = IpcsClient()
+client = IpcsClient(argv[1])
 
 @client.route()
 async def hello():
