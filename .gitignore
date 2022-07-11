@@ -1,0 +1,7 @@
+__pycache__
+*.old
+test
+.*
+!.gitignore
+*.*-workspace
+*.*-project
