@@ -4,7 +4,7 @@ from typing import TypeVar, Generic
 
 from asyncio import Route as AsyncioRoute
 
-from .types import BasePayload
+from .types_ import BasePayload
 
 
 __all__ = ("SimplAttrDict", "DataRoute", "payload_to_str")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeVar, Any
+from typing import Protocol, ParamSpec, TypeVar, Any
 from collections.abc import Callable
 
 from inspect import ismethod
@@ -22,7 +22,7 @@ from websockets.legacy.client import connect
 
 from orjson import dumps, loads
 
-from .types import RequestPayload, ResponsePayload, Id, Session, Route
+from .types_ import RequestPayload, ResponsePayload, Id, Session, Route
 from .errors import RouteIsNotFound
 from .utils import SimpleAttrDict, error_to_str, payload_to_str
 from .connection import Connection
@@ -48,14 +48,20 @@ class RouteHandler(Protocol):
         ...
 
 
+ConnectionT = TypeVar("ConnectionT", bound=Connection, covariant=True)
 EhT = TypeVar("EhT", bound=RouteHandler)
 class AbcClient(ABC):
-    def __init__(self, id_: Id, timeout: float = 8.0):
+
+    _loop: asyncio.AbstractEventLoop | None
+
+    def __init__(
+        self, id_: Id, timeout: float = 8.0,
+        connection_cls: type[ConnectionT] | None = None
+    ):
         self.routes: dict[str, RouteHandler] = {}
         # self.listeners: defaultdict[str, list] = defaultdict(list)
-        self.connections: SimpleAttrDict[Connection] = SimpleAttrDict()
-        self.id_, self.timeout = id_, timeout
-        self._loop = None
+        self.connections: SimpleAttrDict[ConnectionT] = SimpleAttrDict()
+        self.id_, self.timeout, self.connection_cls = id_, timeout, connection_cls or Connection
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
@@ -78,11 +84,11 @@ class AbcClient(ABC):
         return await asyncio.gather(*map(
             lambda c: c.send(route, *args, **kwargs),
             filter(key, self.connections.values())
-        ), **asyncio_gather_kwargs)
+        ), **(asyncio_gather_kwargs or {}))
 
     def add_route(self, func: RouteHandler, name: str | None = None) -> None:
         self.routes[
-            (func.__func__.__name__ if ismethod(func) else func.__name__)
+            (func.__func__.__name__ if ismethod(func) else getattr(func, "__name__"))
             if name is None else name
         ] = func
 
@@ -134,14 +140,14 @@ class AbcClient(ABC):
         else:
             data["result"] = result
             data["status"] = "ok"
-        await self.send(data)
+        await self.send_raw(dumps(data))
 
     @abstractmethod
-    async def send(self, payload: RequestPayload | ResponsePayload) -> None:
+    async def send_raw(self, raw: str | bytes) -> None:
         ...
 
     @abstractmethod
-    async def start(self, *args: Any, **kwargs: Any) -> None:
+    async def start(self, uri: str, **kwargs: Any) -> None:
         ...
 
 
@@ -162,7 +168,7 @@ class Client(AbcClient):
                 raise ValueError("The ID had already used by another client.")
             # 現在接続されているクライアントを`.connections`に入れる。
             for id_ in loads(data):
-                self.connections[id_] = Connection(self)
+                self.connections[id_] = self.connection_cls(self)
             # データの取得を開始する。
             try:
                 while True:
@@ -170,5 +176,6 @@ class Client(AbcClient):
             except ConnectionClosedOK:
                 break
 
-    async def send(self, payload: RequestPayload | ResponsePayload) -> None:
-        await self.ws.send(dumps(payload))
+    async def send_raw(self, raw: str | bytes) -> None:
+        assert self.ws is not None
+        await self.ws.send(raw)

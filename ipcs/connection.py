@@ -8,7 +8,7 @@ import asyncio
 
 from orjson import dumps
 
-from .types import RequestPayload, ResponsePayload, Id, Session
+from .types_ import RequestPayload, ResponsePayload, Id, Session
 from .errors import TimeoutError, FailedToProcessError
 from .utils import DataRoute, payload_to_str
 from .client import AbcClient
@@ -27,7 +27,7 @@ class Connection:
         session = self.client.generate_session()
         self.queues[session] = DataRoute()
         # 送信する。
-        await self.client.send(dumps(payload := RequestPayload(
+        await self.client.send_raw(dumps(payload := RequestPayload(
             source=self.client.id_, target=self.id_, secret=False,
             session=session, route=route, types="request",
             args=args, kwargs=kwargs

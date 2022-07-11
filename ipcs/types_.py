@@ -1,6 +1,6 @@
 # icps - Types
 
-from typing import TypeAlias, TypedDict, Literal, Any
+from typing import TypeAlias, Protocol, TypedDict, Literal, Any
 from collections.abc import Sequence
 
 
@@ -27,3 +27,11 @@ class ResponsePayload(BasePayload):
     types: Literal["response"]
     status: Literal["ok", "error"]
     result: Any
+
+
+class WebSocketProtocol(Protocol):
+    async def send(self, data: str | bytes, *args: Any, **kwargs: Any) -> None:
+        ...
+
+    async def recv(self, data: str | bytes, *args: Any, **kwargs: Any) -> None:
+        ...
