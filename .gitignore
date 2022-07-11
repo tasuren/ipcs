@@ -3,5 +3,7 @@ __pycache__
 test
 .*
 !.gitignore
+ipcs.egg-info
+build
 *.*-workspace
 *.*-project
