@@ -125,6 +125,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
     def _on_receive(self, payload: RequestPayload | ResponsePayload) -> None:
         # データを取得した際に呼ばれるべき関数です。
         self.dispatch("on_receive", payload)
+        print(1, payload)
         if payload["types"] == "request":
             # リクエストがされたのなら、そのリクエストに応じる。
             self.loop.create_task(
@@ -150,7 +151,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
             status="error", result=None
         )
         try:
-            if payload["route"] not in self.routes:
+            print(self._secret_routes)
+            if payload["route"] not in self.routes and (
+                payload["secret"] and payload["route"] not in self._secret_routes
+            ):
                 raise RouteIsNotFound("The route is not found: %s" % payload_to_str(payload))
             result = (
                 self._secret_routes[payload["route"]]
@@ -215,11 +219,11 @@ class Client(AbcClient[Connection]):
         self.add_route(self._on_connect, "on_connect", True)
         self.add_route(self._on_disconnect, "on_disconnect", True)
 
-    async def _on_connect(self, _, id_: Id):
+    async def _on_connect(self, _, id_: Id) -> None:
         self.connections[id_] = Connection(self, id_)
         self.dispatch("on_connect", self.connections[id_])
 
-    async def _on_disconnect(self, _, id_: Id):
+    async def _on_disconnect(self, _, id_: Id) -> None:
         self._close_connection(id_)
         self.dispatch("on_disconnect", self.connections[id_])
 
@@ -231,7 +235,9 @@ class Client(AbcClient[Connection]):
             self.ws = cast(WebSocketProtocol, ws)
             # 認証を行う。
             await self.ws.send(f"verify:{self.id_}")
+            print(1)
             if (data := await self.ws.recv()) == "error":
+                print(data)
                 raise ValueError("The ID had already used by another client.")
             # 現在接続されているクライアントを`.connections`に入れる。
             for id_ in loads(data):

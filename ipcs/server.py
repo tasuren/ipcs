@@ -32,6 +32,7 @@ class Server(AbcClient[ConnectionForServer]):
     async def on_connect(self, ws: WebSocketProtocol) -> None:
         # 認証を行う。
         id_ = (await ws.recv())[7:]
+        print(id_)
         assert isinstance(id_, str)
         if id_ in self.connections:
             return await ws.send("error")
@@ -39,7 +40,7 @@ class Server(AbcClient[ConnectionForServer]):
         self.connections[id_].ws = ws
         await ws.send(dumps(list(self.connections.keys())))
         # メインプロセスを実行する。
-        await self.request_all("on_connect", id_)
+        await self.request_all("on_connect", id_, ipcs_secret=True)
         self.dispatch("on_connect", self.connections[id_])
         try:
             while True:
@@ -49,7 +50,7 @@ class Server(AbcClient[ConnectionForServer]):
                 else:
                     self._pass_data(data)
         except ConnectionClosed:
-            await self.request_all("on_disconnect", id_)
+            await self.request_all("on_disconnect", id_, ipcs_secret=True)
             self.dispatch("on_disconnect", self.connections[id_])
 
     async def _send(self, data: RequestPayload | ResponsePayload) -> None:
