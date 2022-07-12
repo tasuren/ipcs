@@ -2,9 +2,10 @@
 
 from typing import TypeVar, Generic
 
-from asyncio import Route as AsyncioRoute
+from asyncio import Event as AsyncioEvent
 
 from .types_ import BasePayload
+from .errors import ClosedConnectionError
 
 
 __all__ = ("SimplAttrDict", "DataRoute", "payload_to_str")
@@ -19,21 +20,31 @@ class SimpleAttrDict(dict[str, ValueT]):
 
 
 DataT = TypeVar("DataT")
-class DataRoute(AsyncioRoute, Generic[DataT]):
+class DataRoute(AsyncioEvent, Generic[DataT]):
 
     data: DataT | None = None
+    null = False
 
     def clear(self) -> None:
         self.data = None
+        self.null = False
         return super().clear()
 
-    def set(self, data: DataT) -> None:
+    def set_with_null(self) -> None:
+        self.null = True
+        return super().set()
+
+    def set(self, data: DataT) -> None: # type: ignore
         self.data = data
         return super().set()
 
-    async def wait(self) -> DataT:
+    async def wait(self) -> DataT: # type: ignore
         await super().wait()
-        return self.data
+        if self.null:
+            raise ClosedConnectionError(
+                "The request response could not be received because the connection was terminated."
+            )
+        return self.data # type: ignore
 
 
 def payload_to_str(payload: BasePayload) -> str:

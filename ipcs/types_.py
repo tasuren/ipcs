@@ -33,5 +33,8 @@ class WebSocketProtocol(Protocol):
     async def send(self, data: str | bytes, *args: Any, **kwargs: Any) -> None:
         ...
 
-    async def recv(self, data: str | bytes, *args: Any, **kwargs: Any) -> None:
+    async def recv(self) -> str | bytes:
+        ...
+
+    async def close(self, code: int = 1000, reason: str = "...") -> None:
         ...

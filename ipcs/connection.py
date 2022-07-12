@@ -1,17 +1,17 @@
 # ipcs - Connection
 
-from typing import Any
+from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any
 
 import asyncio
-
-from orjson import dumps
 
 from .types_ import RequestPayload, ResponsePayload, Id, Session
 from .errors import TimeoutError, FailedToProcessError
 from .utils import DataRoute, payload_to_str
-from .client import AbcClient
+
+if TYPE_CHECKING:
+    from .client import AbcClient
 
 
 __all__ = ("Connection",)
@@ -22,16 +22,27 @@ class Connection:
         self.client, self.id_ = client, id_
         self.queues: dict[Session, DataRoute[ResponsePayload]] = {}
 
-    async def send(self, route: str, *args: Any, **kwargs: Any) -> Any:
+    async def close(self) -> None:
+        for key, value in list(self.queues.items()):
+            if not value.is_set():
+                value.set_with_null()
+            del self.queues[key]
+
+    async def request(
+        self, route: str, *args: Any,
+        ipcs_secret: bool = False,
+        **kwargs: Any
+    ) -> Any:
         # データの準備をする。
         session = self.client.generate_session()
         self.queues[session] = DataRoute()
         # 送信する。
-        await self.client.send_raw(dumps(payload := RequestPayload(
-            source=self.client.id_, target=self.id_, secret=False,
+        self.client.dispatch("on_request", payload := RequestPayload(
+            source=self.client.id_, target=self.id_, secret=ipcs_secret,
             session=session, route=route, types="request",
             args=args, kwargs=kwargs
-        )))
+        ))
+        await self.client._send(payload)
         # レスポンスを待機する。
         try:
             data = await asyncio.wait_for(self.queues[session].wait(), self.client.timeout)

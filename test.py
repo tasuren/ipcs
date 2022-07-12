@@ -1,30 +1,30 @@
 
 from sys import argv
 
-from ipcs import IpcsClient
+from ipcs import Client
 
-client = IpcsClient(argv[1])
+client = Client(argv[1])
 
 @client.route()
-async def hello():
+async def hello(request, a):
     # print("Hello, World!")
     ...
 
 @client.route()
-async def test():
+async def test(request):
     print("test")
 
 @client.listen()
-async def on_connect_at_server(id_):
+async def on_connect(id_):
     if id_ == client.id_:
         return
     from time import time
     result = []
-    print(await client.request("__IPCS_SERVER__", "ping"))
+    print(await client.connections[id_].request("test"))
     for _ in range(1000):
         start = time()
-        await client.request(id_, "hello")
+        await client.connections[id_].request("hello")
         result.append(time() - start)
     print(sum(result) / len(result))
 
-client.run(uri="ws://localhost/", port=8080)
+client.run("ws://localhost/", port=8080)
