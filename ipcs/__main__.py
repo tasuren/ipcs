@@ -4,12 +4,13 @@ from argparse import ArgumentParser
 import logging
 
 try:
-    from ipcs import __version__, Server
+    from ipcs import __version__, Server, Request
+    from ipcs.client import logger
 except ImportError:
     from sys import path as spath
     spath.insert(0, __file__[:-17])
-    from ipcs import __version__, Server
-from ipcs.client import logger
+    from ipcs import __version__, Server, Request
+    from ipcs.client import logger
 
 
 logger.setLevel(logging.INFO)
@@ -35,7 +36,8 @@ def main():
         server = Server(args.server_id)
 
         @server.route()
-        def ping(request):
+        async def ping(request: Request):
+            await request.source.request("test")
             return "pong"
 
         @server.route("print")

@@ -30,7 +30,11 @@ class ConnectionForServer(Connection):
             await self.ws.close(self.client._code, self.client._reason) # type: ignore
 
 
-class Server(AbcClient[ConnectionForServer]):
+class Server(AbcClient[ConnectionForServer | Connection]):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.connections[self.id_] = Connection(self, self.id_)
+
     async def on_connect(self, ws: WebSocketProtocol) -> None:
         # 認証を行う。
         id_ = (await ws.recv())[7:]
@@ -38,9 +42,8 @@ class Server(AbcClient[ConnectionForServer]):
         if id_ in self.connections:
             return await ws.send("error")
         self.connections[id_] = ConnectionForServer(self, id_)
-        self.connections[id_].ws = ws
-        print(1, self.id_)
-        await ws.send(dumps(list(self.connections.keys()) + [self.id_]))
+        self.connections[id_].ws = ws # type: ignore
+        await ws.send(dumps(list(self.connections.keys())))
         # メインプロセスを実行する。
         self.loop.create_task(
             self.request_all("on_connect", id_, ipcs_secret=True),
@@ -75,7 +78,7 @@ class Server(AbcClient[ConnectionForServer]):
             if connection.id_ == data["target"]:
                 logger.info("Transfer data: %s" % payload_to_str(data))
                 self.loop.create_task(
-                    connection.ws.send(dumps(data)),
+                    connection.ws.send(dumps(data)), # type: ignore
                     name="ipcs: Pass data: %s" % data["session"]
                 )
                 break
