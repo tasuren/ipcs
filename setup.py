@@ -35,7 +35,7 @@ setup(
     author_email='tasuren@aol.com',
     license='MIT',
     keywords='ipc',
-    packages=["ipcs", "ipcs.ext"],
+    packages=("ipcs",),
     package_data={"ipcs": ("py.typed",)},
     install_requires=("websockets", "orjson"),
     extras_requires={},

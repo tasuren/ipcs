@@ -39,7 +39,7 @@ class Connection:
         # 送信する。
         self.client.dispatch("on_request", payload := RequestPayload(
             source=self.client.id_, target=self.id_, secret=ipcs_secret,
-            session=session, route=route, types="request",
+            session=session, route=route, type="request",
             args=args, kwargs=kwargs
         ))
         await self.client._send(payload)
@@ -53,6 +53,9 @@ class Connection:
             return data["result"]
         else:
             raise FailedToProcessError(
-                "The request was not processed because an error occurred on the other end: <payload=%s, error=%s>"
-                    % (payload_to_str(payload), data["result"])
+                "The request was not processed because an error occurred on the other end: %s" % data["result"],
+                data["result"]
             )
+
+    def __str__(self) -> str:
+        return f"<Connection id={self.id_}>"

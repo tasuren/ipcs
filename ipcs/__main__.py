@@ -9,7 +9,7 @@ except ImportError:
     from sys import path as spath
     spath.insert(0, __file__[:-17])
     from ipcs import __version__, Server
-from ipcs.server import logger
+from ipcs.client import logger
 
 
 logger.setLevel(logging.INFO)
@@ -22,6 +22,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("--host", default="localhost", help="Host Name")
     parser.add_argument("--port", default=8080, help="Port", type=int)
+    parser.add_argument("--server-id", default="__IPCS_SERVER__", help="Client ID of the server.")
     parser.add_argument("--version", action="store_true", help="Version")
     args = parser.parse_args()
 
@@ -31,7 +32,7 @@ def main():
     else:
         logger.info(f"ipcs v{__version__}")
         logger.info("Host: %s, Port: %s" % (args.host, args.port))
-        server = Server("server")
+        server = Server(args.server_id)
 
         @server.route()
         def ping(request):

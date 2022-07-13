@@ -18,18 +18,23 @@ class BasePayload(TypedDict):
 
 
 class RequestPayload(BasePayload):
-    types: Literal["request"]
+    type: Literal["request"]
     args: Sequence[Any]
     kwargs: dict[str, Any]
 
 
 class ResponsePayload(BasePayload):
-    types: Literal["response"]
+    type: Literal["response"]
     status: Literal["ok", "error"]
     result: Any
 
 
 class WebSocketProtocol(Protocol):
+
+    @property
+    def closed(self) -> bool:
+        ...
+
     async def send(self, data: str | bytes, *args: Any, **kwargs: Any) -> None:
         ...
 

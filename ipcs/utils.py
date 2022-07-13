@@ -4,7 +4,7 @@ from typing import TypeVar, Generic
 
 from asyncio import Event as AsyncioEvent
 
-from .types_ import BasePayload
+from .types_ import RequestPayload, ResponsePayload
 from .errors import ClosedConnectionError
 
 
@@ -47,8 +47,11 @@ class DataRoute(AsyncioEvent, Generic[DataT]):
         return self.data # type: ignore
 
 
-def payload_to_str(payload: BasePayload) -> str:
-    return f"<from={payload['source']}, to={payload['target']}, route={payload['route']}, session={payload['session']}>"
+def payload_to_str(payload: RequestPayload | ResponsePayload) -> str:
+    return "<Payload from={} to={} type={} route={} session={}>".format(
+        payload['source'], payload['target'], payload['type'],
+        payload['route'], payload['session']
+    )
 
 
 def error_to_str(error: Exception) -> str:
