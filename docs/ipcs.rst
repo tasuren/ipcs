@@ -12,14 +12,6 @@ Subpackages
 Submodules
 ----------
 
-ipcs.base module
-----------------
-
-.. automodule:: ipcs.base
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 ipcs.client module
 ------------------
 
@@ -28,10 +20,18 @@ ipcs.client module
    :undoc-members:
    :show-inheritance:
 
-ipcs.exceptions module
+ipcs.connection module
 ----------------------
 
-.. automodule:: ipcs.exceptions
+.. automodule:: ipcs.connection
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+ipcs.errors module
+------------------
+
+.. automodule:: ipcs.errors
    :members:
    :undoc-members:
    :show-inheritance:

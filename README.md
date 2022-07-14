@@ -2,7 +2,7 @@
 # ipcs
 A library for Python for IPC.
 
-**WARNING** This library is currently in alpha.
+**WARNING** This library is currently in beta.
 
 ## Installation
 `pip install ipcs`
@@ -13,37 +13,37 @@ Run `ipcs-server` and run following code.
 ```python
 # Client A
 
-from ipcs import IpcsClient
+from ipcs import Client, Request
 
-client = IpcsClient("A")
+client = Client("a")
 
 @client.route()
-async def hello():
-    print("Hello, World!")
+async def hello(request: Request, word: str):
+    print("Hello, %s!" % word)
 
-client.run(uri="ws://localhost/", port=8080)
+client.run("ws://localhost/", port=8080)
 ```
 ### Client B
 ```python
 # Client B
 
-from ipcs import IpcsClient
+from ipcs import Client
 
-client = IpcsClient("B")
+client = Client("b")
 
 @client.listen()
 async def on_ready():
-    await client.request("A", "hello")
+    # Run client a's hello Route to say greetings to world.
+    await client.connections.a.request("hello", "World")
 
-client.run(uri="ws://localhost/", port=8080)
+client.run("ws://localhost/", port=8080)
 ```
 
 ## LICENSE
 MIT License
 
 ## Contributing
-Do not break the style of the code.  
-Issues and PullRequests should be brief in content.
+Please follow [this coding style](https://gist.github.com/tasuren/bf1fcce48f1e23a5c7e6abd503bdb3c1) as much as possible.
 
 ## Documentation
 Documentation is avaliable [here](https://ipcs.readthedocs.io/en/latest/).

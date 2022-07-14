@@ -1,13 +1,11 @@
 # ipcs - Client
 
 from __future__ import annotations
-from tkinter.messagebox import IGNORE
 
-from typing import TypeAlias, Generic, Concatenate, TypeVar, ParamSpec, Any, cast
+from typing import TypeAlias, Generic, TypeVar, ParamSpec, Any, cast
 from collections.abc import Callable, Coroutine
 
 from inspect import ismethod
-from traceback import print_exc
 from logging import getLogger
 
 from dataclasses import dataclass
@@ -32,14 +30,29 @@ from .connection import Connection
 
 __all__ = ("Request", "AbcClient", "Client", "logger")
 logger = getLogger("ipcs")
+"Log output destination. ipcs use logging from the standard library."
+
+
+def _debug():
+    import logging
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(name)s] [%(levelname)s] %(message)s"))
+    logging.basicConfig(level=logging.DEBUG, handlers=(handler,))
+# _debug()
 
 
 @dataclass
 class Request:
+    "Data class for storing request information."
+
     source: Connection
+    "The sender who made the request."
     session: Session
+    "Session ID to identify the request."
     route: Route
+    "The name of what Route of execution should be executed in the request."
     raw: RequestPayload
+    "This is the raw data of the request."
 
     def __str__(self) -> str:
         return "<Request source={} session={} route={}>".format(
@@ -48,6 +61,7 @@ class Request:
 
     @classmethod
     def from_payload(cls, source: Connection, data: RequestPayload) -> Request:
+        "Create an instance of this class from the requestor connection and raw data."
         return cls(source, data["session"], data["route"], data)
 
 
@@ -60,14 +74,29 @@ def _process_function(func: Callable, name: str | None = None) -> str:
 
 RhP = ParamSpec("RhP")
 RhReT = TypeVar("RhReT")
-RouteHandler: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
+RouteHandler: TypeAlias = Callable[..., Any | Coroutine[Any, Any, Any]]
 EventHandler: TypeAlias = Callable[..., Any | Coroutine[Any, Any, Any]]
 LiT = TypeVar("LiT", bound=EventHandler)
 ConnectionT = TypeVar("ConnectionT", bound=Connection)
 class AbcClient(ABC, Generic[ConnectionT]):
+    """Base class for the client class.
+
+    Args:
+        id_: Client ID. It must be unique among clients connecting to the server.
+        timeout: When a client makes a request, how long it waits for that request.
+
+    Attributes:
+        routes: A dictionary for storing registered Routes.
+        listeners: A dictionary to store listeners for registered events.
+        connections: A dictionary to store :class:`ipcs.connection.Connection` of clients connecting to the server.
+            This dictionary uses :class:`ipcs.utils.SimpleAttrDict` and allows access to dictionary values from attributes.
+        id_: Client ID.
+        timeout: When a client makes a request, how long it waits for that request."""
 
     _loop: asyncio.AbstractEventLoop | None = None
+    _closing = False
     ws: WebSocketProtocol | None = None
+    "The web socket used by the client to communicate with the server."
 
     def __init__(self, id_: Id, timeout: float = 8.0):
         self.routes: dict[str, RouteHandler] = {}
@@ -78,14 +107,25 @@ class AbcClient(ABC, Generic[ConnectionT]):
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
+        "The event loop used by the client."
         if self._loop is None:
             self._loop = asyncio.get_running_loop()
         return self._loop
 
     def add_listener(self, func: EventHandler, name: str | None = None) -> None:
+        """Add a function (called a listener) that executes the event when it occurs.
+        The default available events can be found in the ``EventReference`` menu.
+
+        Args:
+            func: Function to be executed when an event occurs.
+            name: The name of what event to listen for. If ``None``, the function name is used instead."""
         self.listeners[_process_function(func, name)].append(func)
 
     def remove_listener(self, target: EventHandler | str) -> None:
+        """The name of what event to listen for. If ``None``, the function name is used instead.
+
+        Args:
+            target: The name or function of the listener to be deleted."""
         for name, listeners in list(self.listeners.items()):
             if target in listeners:
                 listeners.remove(target) # type: ignore
@@ -93,6 +133,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
                 del self.listeners[name]
 
     def listen(self, name: str | None = None) -> Callable[[LiT], LiT]:
+        """Decorator version of :meth:`.add_listener`.
+
+        Args:
+            name: The name of what event to listen for. If ``None``, the function name is used instead."""
         def decorator(func: LiT) -> LiT:
             self.add_listener(func, name)
             return func
@@ -109,34 +153,58 @@ class AbcClient(ABC, Generic[ConnectionT]):
             logger.exception(self._IGNORE_EXC % f"in {event_name}:")
 
     def dispatch(self, name: str, *args: Any, **kwargs: Any) -> None:
+        """Raises an event.
+
+        Args:
+            name: The name of the event.
+            *args: The arguments to be passed to the event handler (listener).
+            **kwargs: The keyword arguments to be passed to the event handler (listener)."""
         for listener in self.listeners[name]:
             self.loop.create_task(
                 self._dispatch(name, listener, args, kwargs),
                 name="ipcs: Dispatch event: %s" % name
             )
 
-    def add_route(
-        self, func: Callable[Concatenate[Request, RhP], Coroutine[Any, Any, RhReT]],
-        name: str | None = None,
-        secret: bool = False
-    ) -> None:
+    def set_route(self, func: RouteHandler, name: str | None = None, secret: bool = False) -> None:
+        """Registers a function to respond to a request from another client.
+        Now the registered function can be called by another client with the name used for registration. (This is called a request.)
+        Such a function is also called a Route.
+
+        Args:
+            func: Function to register as Route.
+            name: Route Name. If ``None``, the function name is used.
+            secret: If it is ``True``, function is to be registered as a hidden Route.
+                This is used internally in ipcs to add a Route to receive information when a client connects from the server to a new connection, for example.
+                A Route registered in this way cannot be deleted.
+                Therefore, it should not be used outside of ipcs."""
         (self._secret_routes if secret else self.routes)[_process_function(func, name)] = func
 
-    def route(self, name: str | None = None, secret: bool = False) -> Callable[
-        [Callable[Concatenate[Request, RhP], Coroutine[Any, Any, RhReT] | RhReT]],
-        Callable[Concatenate[Request, RhP], Coroutine[Any, Any, RhReT] | RhReT]
-    ]:
+    def remove_route(self, target: RouteHandler | str) -> None:
+        """Delete a Route.
+
+        Args:
+            target: Name or function of Route to be deleted."""
+        for key, route in list(self.routes.items()):
+            if key == target or route == target:
+                del self.routes[key]
+
+    def route(self, name: str | None = None, secret: bool = False) -> Callable[[RhReT], RhReT]:
+        """Decorator version of :meth:`.set_route`.
+
+        Args:
+            name: Please read the description in :meth:`.set_route`.
+            secret: Please read the description in :meth:`.set_route`."""
         def decorator(func):
-            self.add_route(func, name, secret)
+            self.set_route(func, name, secret)
             return func
         return decorator
 
     def generate_session(self) -> Session:
+        "Generates a session ID used to identify the request.\nThis is used inside ipcs."
         return f"{self.id_}-{uuid4()}-{time()}"
 
     def _on_receive(self, payload: RequestPayload | ResponsePayload) -> None:
         # データを取得した際に呼ばれるべき関数です。
-        self.dispatch("on_receive", payload)
         logger.info("Received data: %s" % payload_to_str(payload))
         if payload["type"] == "request":
             # リクエストがされたのなら、そのリクエストに応じる。
@@ -157,7 +225,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
 
     async def _run_route(self, payload: RequestPayload) -> None:
         # 渡されたリクエストデータからRouteを動かして、結果をそのリクエストを送ったクライアントに送り返します。
-        logger.debug("Running route: %s(is_secret=%s)(*%s, **%s)" % (
+        logger.debug("Running route: routes[route_mode(is_secret=%s)]%s(*%s, **%s)" % (
             payload["route"], payload["secret"], payload["args"], payload["kwargs"]
         ))
         data = ResponsePayload(
@@ -174,7 +242,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
                 if payload["secret"] else \
                 self.routes[payload["route"]]
             result = function(
-                Request.from_payload(self.connections[self.id_], payload),
+                Request.from_payload(self.connections[payload["source"]], payload),
                 *payload["args"], **payload["kwargs"]
             )
             if getattr(function, "__ipcs_is_coroutine_function__"):
@@ -198,14 +266,28 @@ class AbcClient(ABC, Generic[ConnectionT]):
         key: Callable[[Connection], bool] = lambda _: True,
         asyncio_gather_kwargs: dict[str, Any] | None = None,
         **kwargs: Any
-    ) -> tuple[Any]:
+    ) -> tuple[Any] | list[Any]:
+        """Make requests to everyone except yourself.
+        This is done internally using ``gather`` in the standard library asyncio.
+
+        Args:
+            route: The name of the Route to request.
+            *args: The arguments to be passed to Route.
+            key: Function executed to determine if a request should be sent.
+                This can be used, for example, to send a request only to IDs that conform to certain rules.
+            asyncio_gather_kwargs: The keyword arguments to be passed to ``asyncio.gather``.
+            **kwargs: The keyword arguments to be passed to Route."""
         return await asyncio.gather(*map(
             lambda c: c.request(route, *args, **kwargs),
-            filter(key, self.connections.values())
+            filter(
+                lambda c: key(c) and c.id_ != self.id_,
+                self.connections.values()
+            )
         ), **(asyncio_gather_kwargs or {}))
 
     @abstractmethod
     async def start(self, *args: Any, **kwargs: Any) -> None:
+        "This method is not fully implemented. Implemented are :class:`ipcs.client.Client` and :class:`ipcs.server.Server`."
         self._closing = False
         self.dispatch("on_ready")
 
@@ -215,10 +297,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
         if isinstance(id_or_connection, Id):
             id_or_connection = self.connections[id_or_connection]
         await id_or_connection.close()
-        del self.connections[id_or_connection.id_]
 
     @abstractmethod
     async def close(self, code: int = 1000, reason: str = "...") -> None:
+        "This method is not fully implemented. Implemented are :class:`ipcs.client.Client` and :class:`ipcs.server.Server`."
         logger.info("Closing...")
         self._closing = True
         self.dispatch("on_close", code, reason)
@@ -234,6 +316,12 @@ class AbcClient(ABC, Generic[ConnectionT]):
             await self.close()
 
     def run(self, *args: Any, **kwargs: Any) -> None:
+        """Start client.
+        It internally uses ``run`` in the standard library asyncio to run :meth:`ipcs.AbcClient.start`.
+
+        Args:
+            *args: The arguments to be passed to :meth:`ipcs.AbcClient.start`.
+            **kwrags: The keyword arguments to be passed to :meth:`ipcs.AbcClient.start`."""
         try:
             asyncio.run(self._wrapped_start(args, kwargs))
         except KeyboardInterrupt:
@@ -241,16 +329,19 @@ class AbcClient(ABC, Generic[ConnectionT]):
 
 
 class Client(AbcClient[Connection]):
+    "This is the class of the client for ipc communication with the server."
 
     ready: asyncio.Event
+    """This is an ``Event`` in the standard library asyncio to put if it has already started (connected to the server).
+    You can use ``await ready.wait()`` to wait until it starts."""
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         # 隠しRouteを追加する。
-        self.add_route(self._on_connect, "on_connect", True)
-        self.add_route(self._on_disconnect, "on_disconnect", True)
+        self.set_route(self._on_connect, "on_connect", True)
+        self.set_route(self._on_disconnect, "on_disconnect", True)
 
-    async def _on_connect(self, _, id_: Id) -> None:
+    def _on_connect(self, _, id_: Id) -> None:
         self.connections[id_] = Connection(self, id_)
         logger.info("Connected new client to server: %s" % id_)
         self.dispatch("on_connect", id_)
@@ -262,7 +353,15 @@ class Client(AbcClient[Connection]):
 
     _CONNECTING = "Connecting to server..."
 
-    async def start(self, *args: Any, **kwargs: Any) -> None:
+    async def start(self, *args: Any, reconnect: bool = True, **kwargs: Any) -> None:
+        """Starts (connects) client.
+
+        Args:
+            *args: The arguments to be passed to ``connect`` in the third party library websockets.
+                Details of ``connect`` is `here <https://websockets.readthedocs.io/en/stable/reference/client.html#websockets.client.connect>`_.
+            reconnect: Whether or not to make the reconnection.
+            **kwargs: The keyword arguments to be passed to ``connect`` in the third party library websockets.
+                Details of ``connect`` is `here <https://websockets.readthedocs.io/en/stable/reference/client.html#websockets.client.connect>`_."""
         self.ready = asyncio.Event()
         self.is_closed = False
         logger.info(self._CONNECTING)
@@ -282,16 +381,23 @@ class Client(AbcClient[Connection]):
             logger.info("Connected")
             self.ready.set()
             await super().start()
+            # メインプロセスを実行する。
             try:
                 while True:
                     self._on_receive(loads(await self.ws.recv()))
             except ConnectionClosed:
-                if self.is_closed:
-                    break
+                ...
             self.dispatch("on_disconnect_from_server")
+            if not reconnect or self.is_closed:
+                break
             logger.info(self._CONNECTING)
 
     async def close(self, code: int = 1000, reason: str = "...") -> None:
+        """Disconnects the client from the server.
+
+        Args:
+            code: This code is used when cutting with a websocket.
+            reason: This reason is used when cutting with a websocket."""
         await super().close(code, reason)
         self.is_closed = True
         if self.ws is not None:

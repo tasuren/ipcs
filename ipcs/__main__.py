@@ -37,7 +37,6 @@ def main():
 
         @server.route()
         async def ping(request: Request):
-            await request.source.request("test")
             return "pong"
 
         @server.route("print")

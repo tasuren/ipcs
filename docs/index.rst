@@ -6,12 +6,12 @@
 Welcome to ipcs's documentation!
 ================================
 IPC is a library for creating programs for easy IPC communication.
+See ``README.md`` in `the GitHub repository <https://github.com/tasuren/ipcs>`_ for usage examples.
 
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
 
-   quickstart
    ipcs
    event_reference
 
@@ -21,4 +21,3 @@ IPC is a library for creating programs for easy IPC communication.
 
    GitHub <https://github.com/tasuren/ipcs>
    PyPi <https://pypi.org/project/ipcs/>
-   Document <https://ipcs.readthedocs.io/en/latest/>
