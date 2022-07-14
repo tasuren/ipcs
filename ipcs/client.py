@@ -387,6 +387,7 @@ class Client(AbcClient[Connection]):
                     self._on_receive(loads(await self.ws.recv()))
             except ConnectionClosed:
                 ...
+            logger.info("Disconnected from server")
             self.dispatch("on_disconnect_from_server")
             if not reconnect or self.is_closed:
                 break
