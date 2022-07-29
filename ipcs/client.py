@@ -312,6 +312,8 @@ class AbcClient(ABC, Generic[ConnectionT]):
     async def _wrapped_start(self, args, kwargs) -> None:
         try:
             await self.start(*args, **kwargs)
+        except Exception:
+            logger.exception("An error occurred during the WebSocket communication process:")
         finally:
             await self.close()
 

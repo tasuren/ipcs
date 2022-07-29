@@ -14,7 +14,7 @@ __all__ = (
 )
 
 
-__version__ = "0.1.0b1"
+__version__ = "0.1.0b2"
 "The version of icps."
 __author__ = "tasuren"
 "The name of the ipcs' author."

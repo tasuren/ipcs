@@ -54,7 +54,8 @@ class Server(AbcClient[ConnectionForServer | Connection]):
         id_ = (await ws.recv())[7:]
         assert isinstance(id_, str)
         if id_ in self.connections:
-            return await ws.send("error")
+            await ws.send("error")
+            return await ws.close(1008, "ID is not appropriate.")
         self.connections[id_] = ConnectionForServer(self, id_)
         self.connections[id_].ws = ws # type: ignore
         await ws.send(dumps(list(self.connections.keys())))
