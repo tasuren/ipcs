@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TypeAlias, Generic, TypeVar, ParamSpec, Any, cast
 from collections.abc import Callable, Coroutine
 
-from inspect import ismethod
+from inspect import ismethod, getfile
 from logging import getLogger
 
 from dataclasses import dataclass
@@ -23,7 +23,7 @@ from websockets.legacy.client import connect
 from orjson import dumps, loads
 
 from .types_ import RequestPayload, ResponsePayload, WebSocketProtocol, Id, Session, Route
-from .errors import RouteIsNotFound
+from .errors import RouteIsNotFound, RequestError
 from .utils import SimpleAttrDict, error_to_str, payload_to_str
 from .connection import Connection
 
@@ -255,7 +255,13 @@ class AbcClient(ABC, Generic[ConnectionT]):
             data["status"] = "ok"
         logger.info("Response: %s" % payload_to_str(payload))
         self.dispatch("on_response", data)
-        await self._send(data)
+        try:
+            await self._send(data)
+        except TypeError:
+            logger.error(
+                "The return value was something that could not be made into data: %s"
+                    % getfile(function)
+            )
 
     async def _send(self, data: RequestPayload | ResponsePayload) -> None:
         assert self.ws is not None
@@ -263,27 +269,36 @@ class AbcClient(ABC, Generic[ConnectionT]):
 
     async def request_all(
         self, route: Route, *args: Any,
-        key: Callable[[Connection], bool] = lambda _: True,
-        asyncio_gather_kwargs: dict[str, Any] | None = None,
+        key_: Callable[[Connection], bool] = lambda _: True,
         **kwargs: Any
-    ) -> tuple[Any] | list[Any]:
+    ) -> dict[Id, tuple[None | Any, None | RequestError]]:
         """Make requests to everyone except yourself.
-        This is done internally using ``gather`` in the standard library asyncio.
 
         Args:
             route: The name of the Route to request.
             *args: The arguments to be passed to Route.
-            key: Function executed to determine if a request should be sent.
+            key_: Function executed to determine if a request should be sent.
                 This can be used, for example, to send a request only to IDs that conform to certain rules.
-            asyncio_gather_kwargs: The keyword arguments to be passed to ``asyncio.gather``.
-            **kwargs: The keyword arguments to be passed to Route."""
-        return await asyncio.gather(*map(
-            lambda c: c.request(route, *args, **kwargs),
-            filter(
-                lambda c: key(c) and c.id_ != self.id_,
-                self.connections.values()
-            )
-        ), **(asyncio_gather_kwargs or {}))
+            **kwargs: The keyword arguments to be passed to Route.
+
+        Returns:
+            The return value is a dictionary whose key is the ID of the requestor and whose value is a tuple containing the return value and the error.
+            If no error occurred, the error value is ``None``."""
+        data = {}
+        for id_, task in [(c.id_, self.loop.create_task(
+            c.request(route, *args, **kwargs),
+            name="ipcs: request_all: %s" % c.id_
+        )) for c in filter(
+            lambda c: key_(c) and c.id_ != self.id_,
+            self.connections.values()
+        )]:
+            result, error = None, None
+            try:
+                result = await task
+            except RequestError as e:
+                error = e
+            data[id_] = (result, error)
+        return data
 
     @abstractmethod
     async def start(self, *args: Any, **kwargs: Any) -> None:

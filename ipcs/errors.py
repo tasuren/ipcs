@@ -28,7 +28,7 @@ class FailedToProcessError(RequestError):
         error: The name and description of the error that occurred at the request destination.
             The format is ``<name>: <content>``."""
 
-    def __init__(self, message: str, error: Exception, *args: Any, **kwargs: Any):
+    def __init__(self, message: str, error: str, *args: Any, **kwargs: Any):
         super().__init__(message, *args, **kwargs)
         self.error = error
 class ClosedConnectionError(RequestError):
