@@ -8,13 +8,11 @@ from .errors import *
 
 
 __all__ = (
-    "__version__", "__author__", "Request", "AbcClient", "Client", "logger",
-    "Connection", "Server", "ConnectionForServer", "IpcsError", "RouteIsNotFound",
-    "RequestError", "TimeoutError", "FailedToProcessError", "ClosedConnectionError"
+    "__version__", "Request", "AbcClient", "Client", "logger",
+    "Connection", "Server", "ConnectionForServer", "IpcsError", "IdIsNotFound",
+    "RequestError", "FailedToProcessError", "ClosedConnectionError"
 )
 
 
-__version__ = "0.1.0b3"
+__version__ = "0.1.0rc0"
 "The version of icps."
-__author__ = "tasuren"
-"The name of the ipcs' author."

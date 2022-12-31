@@ -5,6 +5,8 @@ test
 !.gitignore
 ipcs.egg-info
 build
+dist
 _build
 *.*-workspace
 *.*-project
+*.lock

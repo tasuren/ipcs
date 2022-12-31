@@ -1,14 +1,6 @@
 ipcs package
 ============
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   ipcs.ext
-
 Submodules
 ----------
 

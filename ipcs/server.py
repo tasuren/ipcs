@@ -38,7 +38,7 @@ class Server(AbcClient[ConnectionForServer | Connection]):
     This is not normally used to run ipcs servers. Instead, use ``ipcs-server``, which is available on the command line.
     This command is automatically set up during installation with pip."""
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.connections[self.id_] = Connection(self, self.id_)
 

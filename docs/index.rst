@@ -9,7 +9,7 @@ IPC is a library for creating programs for easy IPC communication.
 See ``README.md`` in `the GitHub repository <https://github.com/tasuren/ipcs>`_ for usage examples.
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 3
    :caption: Contents:
 
    ipcs

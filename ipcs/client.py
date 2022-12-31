@@ -22,8 +22,8 @@ from websockets.legacy.client import connect
 
 from orjson import dumps, loads
 
-from .types_ import RequestPayload, ResponsePayload, WebSocketProtocol, Id, Session, Route
-from .errors import RouteIsNotFound, RequestError
+from .types_ import RequestPayload, ResponsePayload, WebSocketProtocol
+from .errors import IdIsNotFound, RequestError
 from .utils import SimpleAttrDict, error_to_str, payload_to_str
 from .connection import Connection
 
@@ -47,10 +47,10 @@ class Request:
 
     source: Connection
     "The sender who made the request."
-    session: Session
-    "Session ID to identify the request."
-    route: Route
-    "The name of what Route of execution should be executed in the request."
+    session: str
+    "str ID to identify the request."
+    route: str
+    "The name of what str of execution should be executed in the request."
     raw: RequestPayload
     "This is the raw data of the request."
 
@@ -74,7 +74,7 @@ def _process_function(func: Callable, name: str | None = None) -> str:
 
 RhP = ParamSpec("RhP")
 RhReT = TypeVar("RhReT")
-RouteHandler: TypeAlias = Callable[..., Any | Coroutine[Any, Any, Any]]
+strHandler: TypeAlias = Callable[..., Any | Coroutine[Any, Any, Any]]
 EventHandler: TypeAlias = Callable[..., Any | Coroutine[Any, Any, Any]]
 LiT = TypeVar("LiT", bound=EventHandler)
 ConnectionT = TypeVar("ConnectionT", bound=Connection)
@@ -86,7 +86,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
         timeout: When a client makes a request, how long it waits for that request.
 
     Attributes:
-        routes: A dictionary for storing registered Routes.
+        routes: A dictionary for storing registered strs.
         listeners: A dictionary to store listeners for registered events.
         connections: A dictionary to store :class:`ipcs.connection.Connection` of clients connecting to the server.
             This dictionary uses :class:`ipcs.utils.SimpleAttrDict` and allows access to dictionary values from attributes.
@@ -98,9 +98,9 @@ class AbcClient(ABC, Generic[ConnectionT]):
     ws: WebSocketProtocol | None = None
     "The web socket used by the client to communicate with the server."
 
-    def __init__(self, id_: Id, timeout: float = 8.0):
-        self.routes: dict[str, RouteHandler] = {}
-        self._secret_routes: dict[str, RouteHandler] = {}
+    def __init__(self, id_: str, timeout: float = 8.0) -> None:
+        self.routes: dict[str, strHandler] = {}
+        self._secret_routes: dict[str, strHandler] = {}
         self.listeners: defaultdict[str, list[EventHandler]] = defaultdict(list)
         self.connections: SimpleAttrDict[ConnectionT] = SimpleAttrDict()
         self.id_, self.timeout = id_, timeout
@@ -165,25 +165,25 @@ class AbcClient(ABC, Generic[ConnectionT]):
                 name="ipcs: Dispatch event: %s" % name
             )
 
-    def set_route(self, func: RouteHandler, name: str | None = None, secret: bool = False) -> None:
+    def set_route(self, func: strHandler, name: str | None = None, secret: bool = False) -> None:
         """Registers a function to respond to a request from another client.
         Now the registered function can be called by another client with the name used for registration. (This is called a request.)
-        Such a function is also called a Route.
+        Such a function is also called a str.
 
         Args:
-            func: Function to register as Route.
-            name: Route Name. If ``None``, the function name is used.
-            secret: If it is ``True``, function is to be registered as a hidden Route.
-                This is used internally in ipcs to add a Route to receive information when a client connects from the server to a new connection, for example.
-                A Route registered in this way cannot be deleted.
+            func: Function to register as str.
+            name: str Name. If ``None``, the function name is used.
+            secret: If it is ``True``, function is to be registered as a hidden str.
+                This is used internally in ipcs to add a str to receive information when a client connects from the server to a new connection, for example.
+                A str registered in this way cannot be deleted.
                 Therefore, it should not be used outside of ipcs."""
         (self._secret_routes if secret else self.routes)[_process_function(func, name)] = func
 
-    def remove_route(self, target: RouteHandler | str) -> None:
-        """Delete a Route.
+    def remove_route(self, target: strHandler | str) -> None:
+        """Delete a str.
 
         Args:
-            target: Name or function of Route to be deleted."""
+            target: Name or function of str to be deleted."""
         for key, route in list(self.routes.items()):
             if key == target or route == target:
                 del self.routes[key]
@@ -199,7 +199,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
             return func
         return decorator
 
-    def generate_session(self) -> Session:
+    def generate_session(self) -> str:
         "Generates a session ID used to identify the request.\nThis is used inside ipcs."
         return f"{self.id_}-{uuid4()}-{time()}"
 
@@ -216,7 +216,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
             # レスポンスが来たのなら、そのレスポンスを待機しているEventを探し待機終了させる。
             if payload["source"] in self.connections:
                 try:
-                    self.connections[payload["source"]].queues[payload["session"]] \
+                    self.connections[payload["source"]].queue[payload["session"]] \
                         .set(payload)
                 except KeyError:
                     logger.warning("Got a response for which the requestor does not exist: %s" % payload_to_str(payload))
@@ -224,7 +224,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
                 logger.warning("Got a response that I don't know from which client the response came: %s" % payload_to_str(payload))
 
     async def _run_route(self, payload: RequestPayload) -> None:
-        # 渡されたリクエストデータからRouteを動かして、結果をそのリクエストを送ったクライアントに送り返します。
+        # 渡されたリクエストデータからstrを動かして、結果をそのリクエストを送ったクライアントに送り返します。
         logger.debug("Running route: routes[route_mode(is_secret=%s)]%s(*%s, **%s)" % (
             payload["route"], payload["secret"], payload["args"], payload["kwargs"]
         ))
@@ -233,11 +233,12 @@ class AbcClient(ABC, Generic[ConnectionT]):
             session=payload["session"], route=payload["route"], type="response",
             status="error", result=None
         )
+        function = None
         try:
             if payload["route"] not in self.routes and (
                 payload["secret"] and payload["route"] not in self._secret_routes
             ):
-                raise RouteIsNotFound("The route is not found: %s" % payload_to_str(payload))
+                raise IdIsNotFound("The route is not found: %s" % payload_to_str(payload))
             function = self._secret_routes[payload["route"]] \
                 if payload["secret"] else \
                 self.routes[payload["route"]]
@@ -260,26 +261,42 @@ class AbcClient(ABC, Generic[ConnectionT]):
         except TypeError:
             logger.error(
                 "The return value was something that could not be made into data: %s"
-                    % getfile(function)
+                    % None if function is None else getfile(function)
             )
 
     async def _send(self, data: RequestPayload | ResponsePayload) -> None:
         assert self.ws is not None
         await self.ws.send(dumps(data))
 
+    async def request(self, id_: str, route: str, *args: Any, **kwargs: Any) -> Any:
+        """Sends a request to the specified connection.  
+        Alias of :meth:`ipcs.connection.Connection.request`.
+
+        Args:
+            id_: The id of the connection.
+            route: The route to request.
+            *args: The arguments to be passed to str.
+            **kwargs:  The keyword arguments to be passed to str.
+
+        Raises:
+            ipcs.errors.FailedToProcessError: Occurs when an error occurs at the connection site.
+            ipcs.errors.FailedToRequestError: Occurs when an error occurs while sending a request.
+            ipcs.errors.ClosedConnectionError: Occurs when the connection is broken and a request cannot be made."""
+        return await self.connections[id_].request(route, *args, **kwargs)
+
     async def request_all(
-        self, route: Route, *args: Any,
+        self, route: str, *args: Any,
         key_: Callable[[Connection], bool] = lambda _: True,
         **kwargs: Any
-    ) -> dict[Id, tuple[None | Any, None | RequestError]]:
+    ) -> dict[str, tuple[None | Any, None | RequestError]]:
         """Make requests to everyone except yourself.
 
         Args:
-            route: The name of the Route to request.
-            *args: The arguments to be passed to Route.
+            route: The name of the str to request.
+            *args: The arguments to be passed to str.
             key_: Function executed to determine if a request should be sent.
                 This can be used, for example, to send a request only to IDs that conform to certain rules.
-            **kwargs: The keyword arguments to be passed to Route.
+            **kwargs: The keyword arguments to be passed to str.
 
         Returns:
             The return value is a dictionary whose key is the ID of the requestor and whose value is a tuple containing the return value and the error.
@@ -306,10 +323,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
         self._closing = False
         self.dispatch("on_ready")
 
-    async def _close_connection(self, id_or_connection: Id | Connection) -> None:
+    async def _close_connection(self, id_or_connection: str | Connection) -> None:
         # 接続を消します。
         logger.info("Closing connection: %s" % id_or_connection)
-        if isinstance(id_or_connection, Id):
+        if isinstance(id_or_connection, str):
             id_or_connection = self.connections[id_or_connection]
         await id_or_connection.close()
 
@@ -352,18 +369,18 @@ class Client(AbcClient[Connection]):
     """This is an ``Event`` in the standard library asyncio to put if it has already started (connected to the server).
     You can use ``await ready.wait()`` to wait until it starts."""
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        # 隠しRouteを追加する。
+        # 隠しstrを追加する。
         self.set_route(self._on_connect, "on_connect", True)
         self.set_route(self._on_disconnect, "on_disconnect", True)
 
-    def _on_connect(self, _, id_: Id) -> None:
+    def _on_connect(self, _, id_: str) -> None:
         self.connections[id_] = Connection(self, id_)
         logger.info("Connected new client to server: %s" % id_)
         self.dispatch("on_connect", id_)
 
-    async def _on_disconnect(self, _, id_: Id) -> None:
+    async def _on_disconnect(self, _, id_: str) -> None:
         await self._close_connection(id_)
         logger.info("Disconnected client from server: %s" % id_)
         self.dispatch("on_disconnect", id_)

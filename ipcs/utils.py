@@ -8,7 +8,7 @@ from .types_ import RequestPayload, ResponsePayload
 from .errors import ClosedConnectionError
 
 
-__all__ = ("SimpleAttrDict", "DataRoute", "payload_to_str")
+__all__ = ("SimpleAttrDict", "DataEvent", "payload_to_str")
 
 
 ValueT = TypeVar("ValueT")
@@ -23,8 +23,8 @@ class SimpleAttrDict(dict[str, ValueT]):
 
 
 DataT = TypeVar("DataT")
-class DataRoute(AsyncioEvent, Generic[DataT]):
-    """This class extends the ``Event`` class of the standard asyncio library to allow setting some object."""
+class DataEvent(AsyncioEvent, Generic[DataT]):
+    "This class extends the ``Event`` class of the standard asyncio library to allow setting some object."
 
     data: DataT | None = None
     null = False
