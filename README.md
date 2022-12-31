@@ -41,7 +41,7 @@ async def on_ready():
 client.run("ws://localhost/", port=8080)
 ```
 
-## LICENSE
+## License
 MIT License
 
 ## Contributing
