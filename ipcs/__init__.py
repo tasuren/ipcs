@@ -14,5 +14,5 @@ __all__ = (
 )
 
 
-__version__ = "0.1.0rc0"
+__version__ = "0.1.0"
 "The version of icps."
