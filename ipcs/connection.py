@@ -73,7 +73,8 @@ class Connection:
             await self.client._send(payload)
             data = await asyncio.wait_for(self.queue[session].wait(), self.client.timeout)
         except Exception as e:
-            del self.queue[session]
+            if session in self.queue:
+                del self.queue[session]
             error = FailedToRequestError()
             error.__cause__ = e
             raise error

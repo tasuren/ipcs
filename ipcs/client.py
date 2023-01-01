@@ -302,13 +302,13 @@ class AbcClient(ABC, Generic[ConnectionT]):
             The return value is a dictionary whose key is the ID of the requestor and whose value is a tuple containing the return value and the error.
             If no error occurred, the error value is ``None``."""
         data = {}
-        for id_, task in [(c.id_, self.loop.create_task(
+        for id_, task in {(c.id_, self.loop.create_task(
             c.request(route, *args, **kwargs),
             name="ipcs: request_all: %s" % c.id_
         )) for c in filter(
             lambda c: key_(c) and c.id_ != self.id_,
             self.connections.values()
-        )]:
+        )}:
             result, error = None, None
             try:
                 result = await task
@@ -420,7 +420,7 @@ class Client(AbcClient[Connection]):
                 while True:
                     self._on_receive(loads(await self.ws.recv()))
             except ConnectionClosed:
-                ...
+                pass
             logger.info("Disconnected from server")
             self.dispatch("on_disconnect_from_server")
             if not reconnect or self.is_closed:
