@@ -42,7 +42,7 @@ client.run("ws://localhost/", port=8080)
 ```
 
 ## License
-MIT License
+The license is MIT and details can be found [here](https://github.com/tasuren/ipcs/blob/main/LICENSE).
 
 ## Documentation
 Documentation is avaliable [here](https://ipcs.readthedocs.io/en/latest/).
