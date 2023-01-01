@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.abspath('../'))
 # -- Project information -----------------------------------------------------
 
 project = 'ipcs'
-copyright = '2022, tasuren'
-author = 'tasuren'
+author = 'Takagi Tasuku'
+copyright = '2022, %s' % author
 
 # The full version, including alpha/beta/rc tags
 with open("../ipcs/__init__.py", "r") as f:

@@ -15,4 +15,3 @@ python:
   install:
     - requirements: docs/requirements.txt
     - requirements: requirements.txt
-    - requirements: extra_sanic_requirements.txt
