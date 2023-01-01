@@ -44,8 +44,5 @@ client.run("ws://localhost/", port=8080)
 ## License
 MIT License
 
-## Contributing
-Please follow [this coding style](https://gist.github.com/tasuren/bf1fcce48f1e23a5c7e6abd503bdb3c1) as much as possible.
-
 ## Documentation
 Documentation is avaliable [here](https://ipcs.readthedocs.io/en/latest/).
