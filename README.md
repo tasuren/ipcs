@@ -3,8 +3,6 @@
 A library for Python for IPC.  
 (Although it is written as IPC, it can also be used for communication with an external server.)
 
-**WARNING** This library is currently in preview.
-
 ## Installation
 `$ pip install ipcs`
 
