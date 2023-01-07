@@ -261,7 +261,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
         except TypeError:
             logger.error(
                 "The return value was something that could not be made into data: %s"
-                    % None if function is None else getfile(function)
+                    % (None if function is None else getfile(function))
             )
 
     async def _send(self, data: RequestPayload | ResponsePayload) -> None:
