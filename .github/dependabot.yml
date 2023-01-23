@@ -1,0 +1,8 @@
+# ipcs - DependaBot
+
+version: 2
+updates:
+  - package-ecosystem: "poetry"
+    directory: "/"
+    schedule:
+      interval: "daily"
