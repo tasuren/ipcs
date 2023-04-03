@@ -1,4 +1,6 @@
-# ipcs - Utils
+"ipcs - Utils"
+
+__all__ = ("SimpleAttrDict", "DataEvent", "payload_to_str")
 
 from typing import TypeVar, Generic
 
@@ -6,9 +8,6 @@ from asyncio import Event as AsyncioEvent
 
 from .types_ import RequestPayload, ResponsePayload
 from .errors import ClosedConnectionError
-
-
-__all__ = ("SimpleAttrDict", "DataEvent", "payload_to_str")
 
 
 ValueT = TypeVar("ValueT")

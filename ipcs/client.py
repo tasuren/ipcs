@@ -1,6 +1,8 @@
-# ipcs - Client
+"ipcs - Client"
 
 from __future__ import annotations
+
+__all__ = ("Request", "AbcClient", "Client", "logger")
 
 from typing import TypeAlias, Generic, TypeVar, ParamSpec, Any, cast
 from collections.abc import Callable, Coroutine
@@ -28,7 +30,6 @@ from .utils import SimpleAttrDict, error_to_str, payload_to_str
 from .connection import Connection
 
 
-__all__ = ("Request", "AbcClient", "Client", "logger")
 logger = getLogger("ipcs")
 "Log output destination. ipcs use logging from the standard library."
 
@@ -399,28 +400,34 @@ class Client(AbcClient[Connection]):
         self.ready = asyncio.Event()
         self.is_closed = False
         logger.info(self._CONNECTING)
+
         async for ws in connect(*args, **kwargs):
             self.ready.clear()
             self.ws = cast(WebSocketProtocol, ws)
+
             # 認証を行う。
             logger.info("Verifing...")
             await self.ws.send(f"verify:{self.id_}")
             if (data := await self.ws.recv()) == "error":
                 raise ValueError("The ID had already used by another client.")
             logger.info("Loading connections...")
+
             # 現在接続されているクライアントを`.connections`に入れる。
             for id_ in loads(data):
                 self.connections[id_] = Connection(self, id_)
+
             # データの取得を開始する。
             logger.info("Connected")
             self.ready.set()
             await super().start()
+
             # メインプロセスを実行する。
             try:
                 while True:
                     self._on_receive(loads(await self.ws.recv()))
             except ConnectionClosed:
                 pass
+
             logger.info("Disconnected from server")
             self.dispatch("on_disconnect_from_server")
             if not reconnect or self.is_closed:

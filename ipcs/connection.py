@@ -1,6 +1,8 @@
-# ipcs - Connection
+"ipcs - Connection"
 
 from __future__ import annotations
+
+__all__ = ("Connection",)
 
 from typing import TYPE_CHECKING, Any
 
@@ -8,13 +10,10 @@ import asyncio
 
 from .types_ import RequestPayload, ResponsePayload
 from .errors import FailedToProcessError, FailedToRequestError
-from .utils import DataEvent, payload_to_str
+from .utils import DataEvent
 
 if TYPE_CHECKING:
     from .client import AbcClient
-
-
-__all__ = ("Connection",)
 
 
 class Connection:
@@ -62,12 +61,14 @@ class Connection:
         # データの準備をする。
         session = self.client.generate_session()
         self.queue[session] = DataEvent()
+
         # 送信する。
         self.client.dispatch("on_request", payload := RequestPayload(
             source=self.client.id_, target=self.id_, secret=ipcs_secret,
             session=session, route=route, type="request",
             args=args, kwargs=kwargs
         ))
+
         # レスポンスを待機する。
         try:
             await self.client._send(payload)
@@ -80,6 +81,7 @@ class Connection:
             raise error
         else:
             del self.queue[session]
+
         # レスポンスを返す。必要に応じてエラーを発生させる。
         if data["status"] == "ok":
             return data["result"]

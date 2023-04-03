@@ -1,12 +1,11 @@
-# ipcs - Errors
-
-from typing import Any
-
+"ipcs - Errors"
 
 __all__ = (
     "IpcsError", "IdIsNotFound", "RequestError", "FailedToRequestError",
     "FailedToProcessError", "ClosedConnectionError"
 )
+
+from typing import Any
 
 
 class IpcsError(Exception):

@@ -1,4 +1,4 @@
-# ipcs Examples - Chat Client
+"ipcs Examples - Chat Client"
 
 from aioconsole import ainput
 from ipcs import Client

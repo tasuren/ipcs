@@ -1,4 +1,10 @@
-# ipcs
+"ipcs"
+
+__all__ = (
+    "__version__", "Request", "AbcClient", "Client", "logger",
+    "Connection", "Server", "ConnectionForServer", "IpcsError", "IdIsNotFound",
+    "RequestError", "FailedToProcessError", "ClosedConnectionError"
+)
 
 from .connection import Connection
 from .server import *
@@ -7,12 +13,5 @@ from .server import *
 from .errors import *
 
 
-__all__ = (
-    "__version__", "Request", "AbcClient", "Client", "logger",
-    "Connection", "Server", "ConnectionForServer", "IpcsError", "IdIsNotFound",
-    "RequestError", "FailedToProcessError", "ClosedConnectionError"
-)
-
-
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 "The version of icps."

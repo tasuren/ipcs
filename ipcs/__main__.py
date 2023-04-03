@@ -1,4 +1,4 @@
-# ipcs - Main
+"ipcs - Main"
 
 from argparse import ArgumentParser
 import logging

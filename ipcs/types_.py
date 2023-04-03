@@ -1,13 +1,12 @@
-# icps - Types
-
-from typing import TypeAlias, Protocol, TypedDict, Literal, Any
-from collections.abc import Sequence
-
+"icps - Types"
 
 __all__ = (
     "BasePayload", "RequestPayload",
     "ResponsePayload", "WebSocketProtocol"
 )
+
+from typing import Protocol, TypedDict, Literal, Any
+from collections.abc import Sequence
 
 
 class BasePayload(TypedDict):

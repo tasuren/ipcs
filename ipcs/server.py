@@ -1,4 +1,6 @@
-# ipcs - Server
+"ipcs - Server"
+
+__all__ = ("ConnectionForServer", "Server")
 
 from typing import Any
 
@@ -13,9 +15,6 @@ from .types_ import WebSocketProtocol, RequestPayload, ResponsePayload
 from .utils import payload_to_str
 from .connection import Connection
 from .client import AbcClient, logger
-
-
-__all__ = ("ConnectionForServer", "Server")
 
 
 class ConnectionForServer(Connection):
