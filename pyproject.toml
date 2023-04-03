@@ -23,7 +23,7 @@ ipcs-server = "ipcs.__main__:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-websockets = "10.*"
+websockets = ">=10,<12"
 orjson = "3.8.*"
 
 [build-system]
