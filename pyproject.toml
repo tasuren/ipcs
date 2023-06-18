@@ -1,31 +1,43 @@
-[tool.poetry]
+[project]
 name = "ipcs"
-version = "0.1.4"
+version = "0.1.5.post1"
 description = "Simple IPC server/client"
-authors = ["Takagi Tasuku <tasuren@outlook.jp>"]
+keywords = ["ipc", "networking"]
 license = "MIT"
 readme = "README.md"
-keywords = ["ipc", "networking"]
+license-files = { paths = ["LICENSE"] }
 classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.10",
     "Typing :: Typed"
 ]
+authors = [
+    { name = "Takagi Tasuku", email = "tasuren@outlook.jp" }
+]
+requires-python = ">= 3.10"
+dependencies = [
+    "websockets~=11.0.3",
+    "orjson~=3.9.1",
+]
 
-[tool.poetry.urls]
+[project.urls]
 Source = "https://github.com/tasuren/ipcs"
 Documentation = "https://ipcs.readthedocs.io/"
 Donate = "https://www.buymeacoffee.com/tasuren"
 Chat = "https://discord.gg/kfMwZUyGFG"
 
-[tool.poetry.scripts]
+[project.scripts]
 ipcs-server = "ipcs.__main__:main"
 
-[tool.poetry.dependencies]
-python = "^3.10"
-websockets = ">=10,<12"
-orjson = "3.8.*"
-
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "aioconsole~=0.6.1",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
