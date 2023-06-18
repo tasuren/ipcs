@@ -1,5 +1,3 @@
-"ipcs - Errors"
-
 __all__ = (
     "IpcsError", "IdIsNotFound", "RequestError", "FailedToRequestError",
     "FailedToProcessError", "ClosedConnectionError"

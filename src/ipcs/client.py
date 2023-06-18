@@ -1,5 +1,3 @@
-"ipcs - Client"
-
 from __future__ import annotations
 
 __all__ = ("Request", "AbcClient", "Client", "logger")
@@ -235,11 +233,13 @@ class AbcClient(ABC, Generic[ConnectionT]):
             status="error", result=None
         )
         function = None
+
         try:
             if payload["route"] not in self.routes and (
                 payload["secret"] and payload["route"] not in self._secret_routes
             ):
                 raise IdIsNotFound("The route is not found: %s" % payload_to_str(payload))
+
             function = self._secret_routes[payload["route"]] \
                 if payload["secret"] else \
                 self.routes[payload["route"]]
@@ -247,6 +247,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
                 Request.from_payload(self.connections[payload["source"]], payload),
                 *payload["args"], **payload["kwargs"]
             )
+
             if getattr(function, "__ipcs_is_coroutine_function__"):
                 result = await result
         except Exception as error:
@@ -255,8 +256,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
         else:
             data["result"] = result
             data["status"] = "ok"
+
         logger.info("Response: %s" % payload_to_str(payload))
         self.dispatch("on_response", data)
+
         try:
             await self._send(data)
         except TypeError:
@@ -311,11 +314,14 @@ class AbcClient(ABC, Generic[ConnectionT]):
             self.connections.values()
         )}:
             result, error = None, None
+
             try:
                 result = await task
             except RequestError as e:
                 error = e
+
             data[id_] = (result, error)
+
         return data
 
     @abstractmethod
@@ -335,8 +341,10 @@ class AbcClient(ABC, Generic[ConnectionT]):
     async def close(self, code: int = 1000, reason: str = "...") -> None:
         "This method is not fully implemented. Implemented are :class:`ipcs.client.Client` and :class:`ipcs.server.Server`."
         logger.info("Closing...")
+
         self._closing = True
         self.dispatch("on_close", code, reason)
+
         await asyncio.gather(*(
             self._close_connection(connection)
             for connection in list(self.connections.values())
@@ -360,7 +368,7 @@ class AbcClient(ABC, Generic[ConnectionT]):
         try:
             asyncio.run(self._wrapped_start(args, kwargs))
         except KeyboardInterrupt:
-            ...
+            pass
 
 
 class Client(AbcClient[Connection]):

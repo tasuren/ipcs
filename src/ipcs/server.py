@@ -1,5 +1,3 @@
-"ipcs - Server"
-
 __all__ = ("ConnectionForServer", "Server")
 
 from typing import Any

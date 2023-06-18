@@ -1,5 +1,3 @@
-"ipcs - Connection"
-
 from __future__ import annotations
 
 __all__ = ("Connection",)

@@ -1,5 +1,3 @@
-"icps - Types"
-
 __all__ = (
     "BasePayload", "RequestPayload",
     "ResponsePayload", "WebSocketProtocol"
@@ -52,8 +50,7 @@ class WebSocketProtocol(Protocol):
 
     @property
     def closed(self) -> bool:
-        "Returns whether the websocket is closed or not."
-        ...
+        "Returns whether the websocket is closed or not."; ...
 
     async def send(self, data: Any, *args: Any, **kwargs: Any) -> None:
         "Sends data via websockets."

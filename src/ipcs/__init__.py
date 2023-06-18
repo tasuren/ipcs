@@ -1,5 +1,3 @@
-"ipcs"
-
 __all__ = (
     "__version__", "Request", "AbcClient", "Client", "logger",
     "Connection", "Server", "ConnectionForServer", "IpcsError", "IdIsNotFound",
@@ -13,5 +11,5 @@ from .server import *
 from .errors import *
 
 
-__version__ = "0.1.4"
+__version__ = "0.1.5.post1"
 "The version of icps."

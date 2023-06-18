@@ -1,5 +1,3 @@
-"ipcs - Utils"
-
 __all__ = ("SimpleAttrDict", "DataEvent", "payload_to_str")
 
 from typing import TypeVar, Generic
