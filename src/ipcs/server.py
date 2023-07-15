@@ -1,8 +1,9 @@
-__all__ = ("ConnectionForServer", "Server")
+__all__ = ("ConnectionForServer", "Server", "logger")
 
 from typing import Any
 
 from asyncio import Future
+from logging import getLogger
 
 from websockets.exceptions import ConnectionClosed
 from websockets.server import serve
@@ -12,7 +13,10 @@ from orjson import loads, dumps
 from .types_ import WebSocketProtocol, RequestPayload, ResponsePayload
 from .utils import payload_to_str
 from .connection import Connection
-from .client import AbcClient, logger
+from .client import AbcClient
+
+
+logger = getLogger(__name__)
 
 
 class ConnectionForServer(Connection):

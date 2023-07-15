@@ -28,8 +28,7 @@ from .utils import SimpleAttrDict, error_to_str, payload_to_str
 from .connection import Connection
 
 
-logger = getLogger("ipcs")
-"Log output destination. ipcs use logging from the standard library."
+logger = getLogger(__name__)
 
 
 def _debug():

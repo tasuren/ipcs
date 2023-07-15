@@ -2,13 +2,11 @@ from argparse import ArgumentParser
 import logging
 
 try:
-    from ipcs import __version__, Server, Request
-    from ipcs.client import logger
+    from ipcs import __version__, Server, Request, logger
 except ImportError:
     from sys import path as spath
     spath.insert(0, __file__[:-17])
-    from ipcs import __version__, Server, Request
-    from ipcs.client import logger
+    from ipcs import __version__, Server, Request, logger
 
 
 logger.setLevel(logging.INFO)
