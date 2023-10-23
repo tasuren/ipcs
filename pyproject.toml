@@ -16,7 +16,7 @@ authors = [
 ]
 requires-python = ">= 3.10"
 dependencies = [
-    "websockets~=11.0.3",
+    "websockets>=11.0.3,<12.1.0",
     "orjson~=3.9.2",
 ]
 
