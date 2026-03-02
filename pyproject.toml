@@ -23,8 +23,6 @@ dependencies = [
 [project.urls]
 Source = "https://github.com/tasuren/ipcs"
 Documentation = "https://ipcs.readthedocs.io/"
-Donate = "https://www.buymeacoffee.com/tasuren"
-Chat = "https://discord.gg/kfMwZUyGFG"
 
 [project.scripts]
 ipcs-server = "ipcs.__main__:main"
