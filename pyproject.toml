@@ -33,3 +33,8 @@ build-backend = "hatchling.build"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "aioconsole>=0.8.2",
+]
