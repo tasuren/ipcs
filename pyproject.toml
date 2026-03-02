@@ -1,6 +1,6 @@
 [project]
 name = "ipcs"
-version = "0.2.1"
+version = "0.2.2"
 description = "Simple IPC server/client"
 keywords = ["ipc", "networking"]
 license = "MIT"
@@ -19,7 +19,7 @@ authors = [
 ]
 requires-python = ">= 3.10"
 dependencies = [
-    "websockets>=11.0.3,<12.1.0",
+    "websockets>=16.0",
     "orjson>=3.10",
 ]
 
